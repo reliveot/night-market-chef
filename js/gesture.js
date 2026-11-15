@@ -1,0 +1,227 @@
+/**
+ * One Euro Filter：低速移動時強力濾除手部顫抖，高速移動時保持低延遲
+ */
+export class OneEuroFilter {
+  constructor(minCutoff = 1.0, beta = 0.015, dCutoff = 1.0) {
+    this.minCutoff = minCutoff;
+    this.beta = beta;
+    this.dCutoff = dCutoff;
+    this.xPrev = null;
+    this.dxPrev = 0;
+    this.tPrev = null;
+  }
+
+  reset() {
+    this.xPrev = null;
+    this.dxPrev = 0;
+    this.tPrev = null;
+  }
+
+  alpha(cutoff, dt) {
+    const tau = 1.0 / (2 * Math.PI * cutoff);
+    return 1.0 / (1.0 + tau / dt);
+  }
+
+  filter(x, tMs) {
+    if (this.tPrev === null) {
+      this.xPrev = x;
+      this.tPrev = tMs;
+      return x;
+    }
+    const dt = Math.max(0.001, (tMs - this.tPrev) / 1000.0);
+    this.tPrev = tMs;
+
+    const dx = (x - this.xPrev) / dt;
+    const edx = this.dxPrev + this.alpha(this.dCutoff, dt) * (dx - this.dxPrev);
+    this.dxPrev = edx;
+
+    const cutoff = this.minCutoff + this.beta * Math.abs(edx);
+    const filtered = this.xPrev + this.alpha(cutoff, dt) * (x - this.xPrev);
+    this.xPrev = filtered;
+    return filtered;
+  }
+}
+
+export const DIR_VECTORS = {
+  UP:    { dx:  0, dy: -1, glyph: '↑', opposite: 'DOWN' },
+  UR:    { dx:  0.7071, dy: -0.7071, glyph: '↗', opposite: 'DL' },
+  RIGHT: { dx:  1, dy:  0, glyph: '→', opposite: 'LEFT' },
+  DR:    { dx:  0.7071, dy:  0.7071, glyph: '↘', opposite: 'UL' },
+  DOWN:  { dx:  0, dy:  1, glyph: '↓', opposite: 'UP' },
+  DL:    { dx: -0.7071, dy:  0.7071, glyph: '↙', opposite: 'UR' },
+  LEFT:  { dx: -1, dy:  0, glyph: '←', opposite: 'RIGHT' },
+  UL:    { dx: -0.7071, dy: -0.7071, glyph: '↖', opposite: 'DR' },
+};
+
+/**
+ * 動作判定引擎：
+ * 1. DIRECTION：非固定起點動態投影向量判定（支援慢速、小幅度與折返揮動）
+ * 2. HOLD：穩定維持 3 秒（允許自然顫抖半徑與 400ms 瞬跳寬限）
+ * 3. STIR：自由翻炒（參考點滑動法 Reference Anchor Stepping，不限方向累積距離）
+ */
+export class GestureJudge {
+  constructor() {
+    this.filterX = new OneEuroFilter(1.1, 0.02);
+    this.filterY = new OneEuroFilter(1.1, 0.02);
+
+    this.distThreshold = 0.18;
+    this.angleToleranceDeg = 45;
+    this.stirMultiplier = 5;
+
+    this.resetState();
+  }
+
+  resetState() {
+    this.anchor = null;
+    this.cooldownUntil = 0;
+    this.stableSince = null;
+
+    this.holdElapsedMs = 0;
+    this.holdOutGraceMs = 0;
+    this.lastFrameTime = null;
+
+    this.stirAccumulated = 0;
+    this.stirRefPoint = null;
+    this.lastStirActiveMs = 0;
+  }
+
+  onTrackingLost() {
+    this.filterX.reset();
+    this.filterY.reset();
+    this.anchor = null;
+    this.stableSince = null;
+    this.lastFrameTime = null;
+    this.stirRefPoint = null; // 保留 stirAccumulated 與 holdElapsedMs，恢復後可繼續累積
+  }
+
+  updatePoint(rawX, rawY, nowMs, taskConfig) {
+    const x = this.filterX.filter(rawX, nowMs);
+    const y = this.filterY.filter(rawY, nowMs);
+
+    const dtMs = this.lastFrameTime ? Math.min(200, nowMs - this.lastFrameTime) : 16;
+    this.lastFrameTime = nowMs;
+
+    if (nowMs < this.cooldownUntil) {
+      this.anchor = { x, y };
+      this.stirRefPoint = { x, y };
+      return { status: 'cooldown', x, y, progress: 0 };
+    }
+
+    if (!this.stableSince) {
+      this.stableSince = nowMs;
+      this.anchor = { x, y };
+      this.stirRefPoint = { x, y };
+      return { status: 'stabilizing', x, y, progress: 0 };
+    }
+    if (nowMs - this.stableSince < 180) {
+      this.anchor = { x, y };
+      this.stirRefPoint = { x, y };
+      return { status: 'stabilizing', x, y, progress: 0 };
+    }
+
+    if (taskConfig.type === 'DIRECTION') {
+      return this._evalDirection(x, y, nowMs, taskConfig.requiredDirKey);
+    } else if (taskConfig.type === 'HOLD') {
+      return this._evalHold(x, y, dtMs);
+    } else if (taskConfig.type === 'STIR') {
+      return this._evalStir(x, y, nowMs);
+    }
+    return { status: 'idle', x, y, progress: 0 };
+  }
+
+  _evalDirection(x, y, nowMs, dirKey) {
+    if (!this.anchor) this.anchor = { x, y };
+    const target = DIR_VECTORS[dirKey];
+    const vx = x - this.anchor.x;
+    const vy = y - this.anchor.y;
+    const dist = Math.hypot(vx, vy);
+    const proj = vx * target.dx + vy * target.dy;
+
+    if (proj < -0.025) {
+      this.anchor = { x, y };
+      return { status: 'tracking', x, y, progress: 0 };
+    }
+
+    const progress = Math.min(1, Math.max(0, proj / this.distThreshold));
+
+    if (dist >= this.distThreshold) {
+      const cosTheta = proj / dist;
+      const angleDeg = (Math.acos(Math.min(1, Math.max(-1, cosTheta))) * 180) / Math.PI;
+      if (angleDeg <= this.angleToleranceDeg) {
+        const startAnchor = { ...this.anchor };
+        this.anchor = { x, y };
+        this.cooldownUntil = nowMs + 380;
+        return { status: 'completed', x, y, startAnchor, progress: 1 };
+      } else {
+        this.anchor = { x, y };
+      }
+    }
+
+    return { status: 'tracking', x, y, progress };
+  }
+
+  _evalHold(x, y, dtMs) {
+    if (!this.anchor) this.anchor = { x, y };
+    const dist = Math.hypot(x - this.anchor.x, y - this.anchor.y);
+    const holdRadius = Math.max(0.055, this.distThreshold * 0.42);
+
+    if (dist <= holdRadius) {
+      this.holdElapsedMs += dtMs;
+      this.holdOutGraceMs = 0;
+    } else {
+      this.holdOutGraceMs += dtMs;
+      if (this.holdOutGraceMs > 400) {
+        this.holdElapsedMs = 0;
+        this.anchor = { x, y };
+      }
+    }
+
+    const progress = Math.min(1, this.holdElapsedMs / 3000);
+    if (this.holdElapsedMs >= 3000) {
+      this.holdElapsedMs = 0;
+      return { status: 'completed', x, y, progress: 1, remainSec: 0 };
+    }
+    return {
+      status: 'tracking',
+      x,
+      y,
+      progress,
+      remainSec: Math.max(0, (3000 - this.holdElapsedMs) / 1000),
+    };
+  }
+
+  _evalStir(x, y, nowMs) {
+    if (!this.stirRefPoint) {
+      this.stirRefPoint = { x, y };
+      return { status: 'tracking', x, y, progress: this._getStirProgress(), isMoving: false };
+    }
+
+    const stepDist = Math.hypot(x - this.stirRefPoint.x, y - this.stirRefPoint.y);
+    const minStepDeadzone = Math.max(0.015, this.distThreshold * 0.14);
+    const maxJumpClamp = 0.30;
+
+    if (stepDist > maxJumpClamp) {
+      this.stirRefPoint = { x, y };
+    } else if (stepDist >= minStepDeadzone) {
+      this.stirAccumulated += stepDist;
+      this.stirRefPoint = { x, y };
+      this.lastStirActiveMs = nowMs;
+    }
+
+    const progress = this._getStirProgress();
+    const isMoving = nowMs - this.lastStirActiveMs < 260;
+
+    if (progress >= 1) {
+      this.stirAccumulated = 0;
+      this.cooldownUntil = nowMs + 380;
+      return { status: 'completed', x, y, progress: 1, isMoving: true };
+    }
+
+    return { status: 'tracking', x, y, progress, isMoving };
+  }
+
+  _getStirProgress() {
+    const targetTotal = this.distThreshold * this.stirMultiplier;
+    return Math.min(1, this.stirAccumulated / targetTotal);
+  }
+}

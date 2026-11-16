@@ -106,7 +106,7 @@ class NightMarketGame {
     this.settings = {
       trainingMode: 'action', // 'action' | 'cognitive'
       cogChoices: 2,          // 2 | 3 | 4
-      inputMode: 'camera',    // 'camera' | 'touch'
+      inputMode: 'touch',     // 'camera' | 'touch'
       gameMode: 'dishes',     // 'dishes' | 'timed' | 'endless'
       categoryFilter: 'ALL',
       targetDishes: 3,
@@ -118,7 +118,7 @@ class NightMarketGame {
       enableDoubleCut: false,
       enableStir: true,
       stirMult: 5,
-      distThreshold: 0.18,
+      distThreshold: 0.15,
       mirrored: true,
       sound: true,
       voice: true,
@@ -219,40 +219,69 @@ class NightMarketGame {
           btn.classList.add('active');
           this.settings[key] = isNum ? Number(btn.dataset.val) : btn.dataset.val;
           if (key === 'gameMode') {
-            document.getElementById('groupDishTarget').classList.toggle('hidden', this.settings.gameMode !== 'dishes');
-            document.getElementById('groupTimeLimit').classList.toggle('hidden', this.settings.gameMode !== 'timed');
+            document.getElementById('groupDishTarget')?.classList.toggle('hidden', this.settings.gameMode !== 'dishes');
+            document.getElementById('groupTimeLimit')?.classList.toggle('hidden', this.settings.gameMode !== 'timed');
           }
+          if (['trainingMode', 'cogChoices', 'dirRule', 'angleTol', 'stirMult'].includes(key)) { this._markCustomPreset(); }
           if (key === 'trainingMode') {
-            document.getElementById('groupCogChoices').classList.toggle('hidden', this.settings.trainingMode !== 'cognitive');
+            document.getElementById('groupCogChoices')?.classList.toggle('hidden', this.settings.trainingMode !== 'cognitive');
+            document.getElementById('rowEnableStir')?.classList.toggle('hidden', this.settings.trainingMode === 'cognitive');
+            document.getElementById('ctrlStirMult')?.classList.toggle('hidden', this.settings.trainingMode === 'cognitive');
           }
         });
       });
     };
 
     bindSeg('ctrlTrainingMode', 'trainingMode');
-    bindSeg('ctrlCogChoices', 'cogChoices', true);
-    bindSeg('ctrlInputMode', 'inputMode');
-    bindSeg('ctrlGameMode', 'gameMode');
-    bindSeg('ctrlCategoryFilter', 'categoryFilter');
-    bindSeg('ctrlDishCount', 'targetDishes', true);
-    bindSeg('ctrlTimeSec', 'timeLimitSec', true);
-    bindSeg('ctrlDirRule', 'dirRule');
-    bindSeg('ctrlAngleTol', 'angleTol', true);
-    bindSeg('ctrlStirMult', 'stirMult', true);
-
-    // 方向組合快速按鈕與 8 宮格個別勾選
-    const dirPresetEl = document.getElementById('ctrlDirPreset');
-    dirPresetEl?.querySelectorAll('button').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        dirPresetEl.querySelectorAll('button').forEach((b) => b.classList.remove('active'));
-        btn.classList.add('active');
-        const val = btn.dataset.val;
-        if (val === '4') this.settings.allowedDirs = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
-        else if (val === '8') this.settings.allowedDirs = ['UP', 'UR', 'RIGHT', 'DR', 'DOWN', 'DL', 'LEFT', 'UL'];
-        else if (val === 'high') this.settings.allowedDirs = ['UL', 'UP', 'UR'];
-        else if (val === 'wide') this.settings.allowedDirs = ['LEFT', 'RIGHT'];
-        this._syncDirChipsUI();
+    document.querySelectorAll('#quickLengthRow .len-pill').forEach((pill) => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('#quickLengthRow .len-pill').forEach((p) => p.classList.remove('active'));
+        pill.classList.add('active');
+        const mode = pill.dataset.mode;
+        const val = Number(pill.dataset.val);
+        this.settings.gameMode = mode;
+        if (mode === 'dishes') this.settings.targetDishes = val;
+        if (mode === 'timed') this.settings.timeLimitSec = val;
+        document.getElementById('ctrlDishCount')?.classList.toggle('hidden', mode !== 'dishes');
+        document.getElementById('ctrlTimeSec')?.classList.toggle('hidden', mode !== 'timed');
       });
+    });
+
+    document.getElementById('btnHudCam')?.addEventListener('click', async () => {
+      const btn = document.getElementById('btnHudCam');
+      if (this.settings.inputMode === 'camera' && this.tracker.stream) {
+        this.settings.inputMode = 'touch';
+        document.getElementById('webcamVideo').style.display = 'none';
+        await this.tracker.start('touch');
+        btn.textContent = '📷 開鏡頭';
+        btn.classList.remove('cam-on');
+        this._syncSegVal('ctrlInputMode', 'touch');
+        this._showToast('👆 已切換為「觸控／滑鼠模式」');
+      } else {
+        try {
+          this.settings.inputMode = 'camera';
+          await this.tracker.start('camera', {
+            mirrored: this.settings.mirrored,
+            lowPerf: this.settings.lowPerf,
+          });
+          document.getElementById('webcamVideo').style.display = 'block';
+          btn.textContent = '📷 鏡頭中';
+          btn.classList.add('cam-on');
+          this._syncSegVal('ctrlInputMode', 'camera');
+          this._showToast('📷 已開啟滿版鏡頭體感！把手舉到畫面中即可揮動');
+        } catch {
+          this.settings.inputMode = 'touch';
+          this._showToast('⚠️ 請在瀏覽器網址列允許相機權限，目前可先用觸控／滑鼠遊玩');
+        }
+      }
+    });
+
+    document.getElementById('btnHudSettings')?.addEventListener('click', () => {
+      this.quitToMenu();
+    });
+
+    document.getElementById('btnDismissGuide')?.addEventListener('click', () => {
+      this._dismissGuide();
     });
 
     document.querySelectorAll('#customDirGrid .dir-chip').forEach((chip) => {
@@ -273,9 +302,9 @@ class NightMarketGame {
       });
     });
 
-    document.querySelectorAll('.preset-btn').forEach((btn) => {
+    document.querySelectorAll('.stage-card').forEach((btn) => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.preset-btn').forEach((b) => b.classList.remove('active'));
+        document.querySelectorAll('.stage-card').forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
         this._applyPreset(btn.dataset.preset);
       });
@@ -302,11 +331,6 @@ class NightMarketGame {
     document.getElementById('chkVoice').addEventListener('change', (e) => {
       this.settings.voice = e.target.checked;
       this.sound.voiceEnabled = e.target.checked;
-    });
-
-    document.getElementById('btnQuickStart').addEventListener('click', () => {
-      this._applyPreset('easy');
-      this.startGame();
     });
     document.getElementById('btnStartCustom').addEventListener('click', () => this.startGame());
 
@@ -358,6 +382,22 @@ class NightMarketGame {
 
     this._initCalibrationModal();
     window.addEventListener('resize', () => this._resizeCanvases());
+  }
+
+  _markCustomPreset() {
+    document.querySelectorAll('.stage-card').forEach((b) => b.classList.remove('active'));
+    const badge = document.getElementById('presetStatusBadge');
+    if (badge) badge.textContent = '目前選擇：🎛️ 已微調為自訂規則';
+  }
+
+  _syncSegVal(id, val) {
+    const c = document.getElementById(id);
+    if (!c) return;
+    c.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.val === String(val)));
+  }
+
+  _dismissGuide() {
+    document.getElementById('quickGuideBar')?.classList.add('fade-out');
   }
 
   _syncDirChipsUI() {
@@ -484,6 +524,7 @@ class NightMarketGame {
     finishBtn.textContent = this.settings.gameMode === 'endless' ? '🏆 打烊結算' : '🏠 結束';
 
     const videoEl = document.getElementById('webcamVideo');
+    const camBtn = document.getElementById('btnHudCam');
     videoEl.classList.toggle('mirrored', this.settings.mirrored);
 
     if (this.settings.inputMode === 'camera') {
@@ -493,6 +534,7 @@ class NightMarketGame {
           lowPerf: this.settings.lowPerf,
         });
         videoEl.style.display = 'block';
+        if (camBtn) { camBtn.textContent = '📷 鏡頭中'; camBtn.classList.add('cam-on'); }
       } catch {
         this._showToast('無法開啟攝影機，已自動切換為「觸控／滑鼠模式」');
         this.settings.inputMode = 'touch';
@@ -501,6 +543,7 @@ class NightMarketGame {
       }
     } else {
       videoEl.style.display = 'none';
+      if (camBtn) { camBtn.textContent = '📷 開鏡頭'; camBtn.classList.remove('cam-on'); }
       await this.tracker.start('touch');
     }
 
@@ -567,7 +610,7 @@ class NightMarketGame {
         id: this.currentDish.id,
         name: this.currentDish.name,
         prepType: 'stir',
-        imgSrc: this.settings.enableStir ? 'assets/common/wok.webp' : this.currentDish.finishImg,
+        imgSrc: this.settings.enableStir ? 'assets/common/wok.webp?v=2.1' : this.currentDish.finishImg,
       },
     ];
     this.stepIndex = 0;
@@ -585,7 +628,7 @@ class NightMarketGame {
 
     catEl.textContent = this.currentDish.category;
     if (isMystery) {
-      thumb.src = 'assets/common/wok.webp';
+      thumb.src = 'assets/common/wok.webp?v=2.1';
       nameEl.textContent = '❓ 神秘料理';
     } else {
       thumb.src = this.currentDish.finishImg;
@@ -994,6 +1037,7 @@ class NightMarketGame {
   // 四大烹飪手感動畫（切菜切半 / 撒粉淋醬 / 倒料下鍋 / 翻面夾取）
   _triggerPrepCompleteAnimation(angleRad = -0.78, isReverse = false, prepType = 'cut') {
     if (this.state !== 'PLAYING') return;
+    this._dismissGuide();
     this.state = 'ANIMATING';
 
     const wrap = document.getElementById('foodHeroWrap');
@@ -1569,5 +1613,6 @@ class NightMarketGame {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  new NightMarketGame();
+  const game = new NightMarketGame();
+  game.startGame();
 });

@@ -79,7 +79,7 @@ body {
 }
 
 .app-container {
-  max-width: 980px;
+  max-width: 940px;
   margin: 0 auto;
   padding: 12px;
 }
@@ -93,7 +93,6 @@ body {
   display: none !important;
 }
 
-/* 當進入遊戲畫面時，切換為 100dvh 滿版全螢幕體感機台 */
 #screenGame.active {
   position: fixed;
   inset: 0;
@@ -106,32 +105,72 @@ body {
 
 .card, .hero-card {
   background: linear-gradient(160deg, rgba(48, 18, 16, 0.92), rgba(28, 11, 10, 0.94));
-  border: 1px solid rgba(251, 191, 36, 0.28);
+  border: 1.5px solid rgba(251, 191, 36, 0.32);
   border-radius: var(--border-radius);
-  padding: 18px;
+  padding: 20px;
   margin-bottom: 14px;
   box-shadow: 0 8px 26px rgba(0, 0, 0, 0.35);
 }
 .hero-card {
   text-align: center;
-  background: radial-gradient(circle at 50% 0%, rgba(185, 28, 28, 0.38), rgba(32, 12, 10, 0.95));
+  background: radial-gradient(circle at 50% 0%, rgba(185, 28, 28, 0.38), rgba(32, 12, 10, 0.96));
   border-color: rgba(251, 191, 36, 0.45);
 }
 .hero-card h1 {
-  margin: 0 0 8px;
-  font-size: 1.55rem;
+  margin: 0 0 6px;
+  font-size: 1.5rem;
   color: #fffbeb;
 }
 .subtitle {
   color: var(--text-muted);
   margin: 0 0 18px;
-  font-size: 0.98rem;
+  font-size: 0.95rem;
 }
+
+/* 極簡二步驟選擇區 */
+.clean-step-block {
+  text-align: left;
+  background: rgba(18, 6, 6, 0.55);
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+.clean-step-title {
+  font-size: 0.98rem;
+  font-weight: 900;
+  color: #fde68a;
+  margin-bottom: 10px;
+  letter-spacing: 0.03em;
+}
+.quick-len-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 8px;
+}
+.len-pill {
+  padding: 12px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 2px solid rgba(251, 191, 36, 0.24);
+  color: rgba(255, 251, 235, 0.85);
+  font-size: 0.96rem;
+  font-weight: 800;
+}
+.len-pill.active {
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
+  border-color: #fde047;
+  color: #1f0c04;
+  font-weight: 900;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
+}
+
 .quick-start-row {
   display: flex;
   gap: 12px;
   justify-content: center;
   flex-wrap: wrap;
+  margin-top: 6px;
 }
 
 button {
@@ -155,19 +194,19 @@ button:active {
   background: linear-gradient(135deg, #fbbf24, #fde047);
 }
 .btn-xl {
-  font-size: 1.18rem;
-  flex: 1;
+  font-size: 1.2rem;
+  flex: 1.3;
   min-width: 240px;
-  max-width: 380px;
+  max-width: 400px;
   padding: 16px;
 }
 .btn-gallery-hero {
-  background: rgba(185, 28, 28, 0.28);
+  background: rgba(185, 28, 28, 0.32);
   border: 2px solid var(--gold-normal);
   color: #fffbeb;
   font-weight: 800;
-  font-size: 1.08rem;
-  padding: 14px 22px;
+  font-size: 1.05rem;
+  padding: 14px 20px;
   min-width: 210px;
 }
 .btn-lg {
@@ -190,17 +229,16 @@ button:active {
   font-weight: 700;
 }
 
-/* 一鍵預設 */
 .preset-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
   gap: 10px;
 }
 .preset-btn {
-  background: rgba(22, 8, 8, 0.78);
+  background: rgba(28, 10, 10, 0.84);
   border: 2px solid rgba(251, 191, 36, 0.22);
   color: var(--text-main);
-  padding: 14px;
+  padding: 13px 14px;
   text-align: left;
   display: flex;
   flex-direction: column;
@@ -208,22 +246,60 @@ button:active {
 }
 .preset-btn.active {
   border-color: var(--gold-normal);
-  background: linear-gradient(135deg, rgba(185, 28, 28, 0.38), rgba(217, 119, 6, 0.25));
-  box-shadow: 0 0 18px rgba(251, 191, 36, 0.22);
+  background: linear-gradient(135deg, rgba(185, 28, 28, 0.44), rgba(217, 119, 6, 0.3));
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.25);
 }
 .preset-btn strong {
-  font-size: 1.06rem;
+  font-size: 1.04rem;
   color: var(--gold-normal);
 }
 .preset-btn span {
-  font-size: 0.84rem;
-  color: rgba(254, 243, 199, 0.8);
+  font-size: 0.82rem;
+  color: rgba(254, 243, 199, 0.82);
 }
 
-/* 設定區塊 */
+/* 可收合進階設定抽屜 */
+.adv-settings-drawer {
+  background: linear-gradient(160deg, rgba(42, 16, 14, 0.9), rgba(24, 9, 9, 0.92));
+  border: 1.5px solid rgba(251, 191, 36, 0.28);
+  border-radius: var(--border-radius);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.adv-settings-drawer summary {
+  list-style: none;
+  padding: 15px 18px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-weight: 800;
+  color: #fde68a;
+  font-size: 0.96rem;
+}
+.adv-settings-drawer summary::-webkit-details-marker {
+  display: none;
+}
+.adv-settings-drawer summary:hover {
+  background: rgba(251, 191, 36, 0.08);
+}
+.adv-Summary-hint {
+  font-size: 0.82rem;
+  color: var(--gold-normal);
+  background: rgba(245, 158, 11, 0.16);
+  padding: 4px 10px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+.adv-drawer-body {
+  padding: 16px 18px 20px;
+  border-top: 1px solid rgba(251, 191, 36, 0.18);
+}
+
 .settings-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(275px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(265px, 1fr));
   gap: 16px;
 }
 .setting-group label {
@@ -231,26 +307,29 @@ button:active {
   font-weight: 800;
   margin-bottom: 8px;
   color: #fde68a;
-  font-size: 0.94rem;
+  font-size: 0.92rem;
 }
 .seg-control {
   display: flex;
   gap: 5px;
-  background: rgba(15, 5, 5, 0.75);
+  background: rgba(15, 5, 5, 0.78);
   padding: 4px;
   border-radius: 12px;
   border: 1px solid rgba(251, 191, 36, 0.18);
+}
+.seg-control.sub-seg {
+  margin-top: 7px;
 }
 .seg-control.seg-wrap {
   flex-wrap: wrap;
 }
 .seg-control button {
   flex: 1;
-  min-width: 64px;
+  min-width: 60px;
   background: transparent;
-  color: rgba(254, 243, 199, 0.72);
-  padding: 8px 6px;
-  font-size: 0.85rem;
+  color: rgba(254, 243, 199, 0.74);
+  padding: 7px 6px;
+  font-size: 0.84rem;
   font-weight: 700;
   border-radius: 8px;
 }
@@ -260,7 +339,6 @@ button:active {
   font-weight: 900;
 }
 
-/* 8 方向自由勾選網格 */
 .dir-check-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -293,7 +371,7 @@ button:active {
   gap: 8px;
   cursor: pointer;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   color: #fffbeb;
 }
 .toggle-label input {
@@ -306,10 +384,7 @@ input[type="range"] {
   width: 100%;
   accent-color: var(--gold-normal);
   height: 28px;
-}
-.start-footer {
-  text-align: center;
-  margin: 16px 0 24px;
+  margin-top: 6px;
 }
 
 /* =====================================================
@@ -338,13 +413,13 @@ input[type="range"] {
   transform: scaleX(-1);
 }
 
+/* 移除 backdrop-filter 避免 iOS Safari WebKit 硬體視訊層變黑 */
 .cam-scrim {
   position: absolute;
   inset: 0;
   z-index: 2;
   background:
-    radial-gradient(circle at 50% 46%, rgba(28, 12, 10, 0.12) 0%, rgba(24, 10, 10, 0.46) 70%, rgba(14, 5, 5, 0.78) 100%);
-  backdrop-filter: blur(1.5px);
+    radial-gradient(circle at 50% 46%, rgba(20, 8, 8, 0.06) 0%, rgba(20, 8, 8, 0.34) 70%, rgba(12, 4, 4, 0.68) 100%);
   pointer-events: none;
 }
 
@@ -356,11 +431,10 @@ input[type="range"] {
   width: min(96vw, 680px);
   height: 110px;
   z-index: 3;
-  background: radial-gradient(ellipse at center, rgba(239, 68, 68, 0.3) 0%, rgba(245, 158, 11, 0.14) 45%, transparent 75%);
+  background: radial-gradient(ellipse at center, rgba(239, 68, 68, 0.28) 0%, rgba(245, 158, 11, 0.12) 45%, transparent 75%);
   pointer-events: none;
 }
 
-/* 頂部極簡夜市懸浮 HUD */
 .top-hud {
   position: absolute;
   top: max(10px, env(safe-area-inset-top));
@@ -374,10 +448,8 @@ input[type="range"] {
   gap: 10px;
   padding: 8px 14px;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(45, 14, 14, 0.76), rgba(22, 8, 8, 0.74));
+  background: linear-gradient(135deg, rgba(45, 14, 14, 0.86), rgba(22, 8, 8, 0.86));
   border: 1.5px solid var(--nm-border);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(254, 243, 199, 0.14);
 }
 
@@ -509,7 +581,6 @@ input[type="range"] {
   background: rgba(220, 38, 38, 0.45);
 }
 
-/* 中央超大食物與細緻立體箭頭舞台 */
 .center-arena {
   position: absolute;
   inset: 0;
@@ -529,33 +600,32 @@ input[type="range"] {
   font-size: 15px;
   font-weight: 900;
   letter-spacing: 0.04em;
-  backdrop-filter: blur(10px);
   border: 1.5px solid rgba(255, 255, 255, 0.25);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.42);
   transition: all 0.25s ease;
 }
 
 .rule-banner.normal {
-  background: linear-gradient(135deg, rgba(180, 83, 9, 0.62), rgba(217, 119, 6, 0.45));
+  background: linear-gradient(135deg, rgba(180, 83, 9, 0.82), rgba(217, 119, 6, 0.72));
   border-color: rgba(251, 191, 36, 0.88);
   color: #fffbeb;
 }
 
 .rule-banner.reverse {
-  background: linear-gradient(135deg, rgba(3, 105, 161, 0.62), rgba(14, 116, 144, 0.48));
+  background: linear-gradient(135deg, rgba(3, 105, 161, 0.82), rgba(14, 116, 144, 0.72));
   border-color: rgba(56, 189, 248, 0.88);
   color: #e0f2fe;
 }
 
 .rule-banner.spoiled {
-  background: linear-gradient(135deg, rgba(153, 27, 27, 0.78), rgba(88, 28, 135, 0.68));
+  background: linear-gradient(135deg, rgba(153, 27, 27, 0.88), rgba(88, 28, 135, 0.8));
   border-color: #f87171;
   color: #fef2f2;
   animation: warnPulse 0.9s ease-in-out infinite;
 }
 
 .rule-banner.stir {
-  background: linear-gradient(135deg, rgba(185, 28, 28, 0.68), rgba(234, 88, 12, 0.55));
+  background: linear-gradient(135deg, rgba(185, 28, 28, 0.82), rgba(234, 88, 12, 0.75));
   border-color: rgba(253, 186, 116, 0.9);
   color: #fff7ed;
 }
@@ -592,7 +662,6 @@ input[type="range"] {
   50% { transform: scale(1.05); opacity: 1; }
 }
 
-/* 壞食材發霉氣場與繞飛小蒼蠅 */
 .spoiled-overlay {
   position: absolute;
   inset: -12px;
@@ -641,7 +710,6 @@ input[type="range"] {
   animation: foodFloat 3s ease-in-out infinite;
 }
 
-/* 僅在自由翻炒主動揮動時觸發震動 */
 .food-img-box.stirring {
   animation: wokShake 0.14s linear infinite !important;
 }
@@ -691,7 +759,6 @@ input[type="range"] {
 }
 
 /* 四大烹飪手感與完成動畫 */
-/* 1. 切菜 (cut) */
 .food-hero-wrap.anim-cut .food-img {
   opacity: 0;
 }
@@ -713,7 +780,6 @@ input[type="range"] {
   100% { transform: translate(34px, -14px) rotate(14deg); opacity: 0; }
 }
 
-/* 2. 撒粉／淋醬 (sprinkle) */
 .food-hero-wrap.anim-sprinkle .food-img-box {
   animation: sprinkleShake 0.52s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
@@ -724,7 +790,6 @@ input[type="range"] {
   100% { transform: scale(0.75); opacity: 0.15; }
 }
 
-/* 3. 倒料／下鍋 (pour) */
 .food-hero-wrap.anim-pour .food-img-box {
   animation: pourTilt 0.52s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
@@ -734,7 +799,6 @@ input[type="range"] {
   100% { transform: translateY(38px) rotate(36deg) scale(0.7); opacity: 0.15; }
 }
 
-/* 4. 翻面／夾取 (flip) */
 .food-hero-wrap.anim-flip .food-img-box {
   animation: flipToss 0.54s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
@@ -744,7 +808,6 @@ input[type="range"] {
   100% { transform: translateY(8px) rotateY(360deg) scale(0.75); opacity: 0.15; }
 }
 
-/* 5. 壞食材掃掉 (spoiled-sweep) */
 .food-hero-wrap.anim-sweep .food-img-box {
   animation: sweepAway 0.48s ease-in forwards !important;
 }
@@ -753,7 +816,6 @@ input[type="range"] {
   100% { transform: translate(140px, -60px) rotate(45deg) scale(0.3); opacity: 0; }
 }
 
-/* 6. 翻炒拋鍋完成 (stir-done) */
 .food-hero-wrap.anim-stir-done .food-img-box {
   animation: wokToss 0.62s cubic-bezier(0.22, 1, 0.36, 1) forwards !important;
 }
@@ -764,7 +826,6 @@ input[type="range"] {
   100% { transform: translateY(10px) scale(0.72) rotate(0deg); opacity: 0.15; }
 }
 
-/* 細緻半透明 3D 發光方向箭頭 */
 .arrow-overlay {
   position: absolute;
   inset: 0;
@@ -830,7 +891,7 @@ input[type="range"] {
   z-index: 25;
   padding: 6px 14px;
   border-radius: 999px;
-  background: rgba(24, 10, 10, 0.84);
+  background: rgba(24, 10, 10, 0.88);
   border: 1.5px solid #4ade80;
   font-size: 15px;
   font-weight: 900;
@@ -842,7 +903,6 @@ input[type="range"] {
   display: block;
 }
 
-/* 自由翻炒熱度條 */
 .stir-meter-wrap {
   margin-top: 8px;
   width: min(72vw, 260px);
@@ -860,7 +920,7 @@ input[type="range"] {
   width: 100%;
   height: 14px;
   border-radius: 999px;
-  background: rgba(24, 10, 10, 0.78);
+  background: rgba(24, 10, 10, 0.85);
   border: 1.5px solid rgba(251, 191, 36, 0.45);
   overflow: hidden;
 }
@@ -887,9 +947,8 @@ input[type="range"] {
   gap: 8px;
   padding: 6px 20px;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(45, 14, 14, 0.82), rgba(20, 8, 8, 0.82));
+  background: linear-gradient(135deg, rgba(45, 14, 14, 0.88), rgba(20, 8, 8, 0.88));
   border: 1.5px solid rgba(251, 191, 36, 0.55);
-  backdrop-filter: blur(8px);
   font-size: 20px;
   font-weight: 900;
   letter-spacing: 0.05em;
@@ -905,9 +964,6 @@ input[type="range"] {
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85);
 }
 
-/* =====================================================
-   認知推理模式第 5 步：2 / 3 / 4 選 1 手部感應選料理卡片
-   ===================================================== */
 .cog-choice-arena {
   position: relative;
   width: min(94vw, 620px);
@@ -921,9 +977,8 @@ input[type="range"] {
   width: clamp(136px, 34vw, 178px);
   padding: 10px 8px;
   border-radius: 20px;
-  background: linear-gradient(160deg, rgba(45, 14, 14, 0.86), rgba(20, 8, 8, 0.88));
+  background: linear-gradient(160deg, rgba(45, 14, 14, 0.9), rgba(20, 8, 8, 0.92));
   border: 2px solid rgba(251, 191, 36, 0.45);
-  backdrop-filter: blur(10px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -933,26 +988,10 @@ input[type="range"] {
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
-.cog-card.pos-LEFT {
-  left: 2%;
-  top: 50%;
-  transform: translateY(-50%);
-}
-.cog-card.pos-RIGHT {
-  right: 2%;
-  top: 50%;
-  transform: translateY(-50%);
-}
-.cog-card.pos-UP {
-  top: 0%;
-  left: 50%;
-  transform: translateX(-50%);
-}
-.cog-card.pos-DOWN {
-  bottom: 0%;
-  left: 50%;
-  transform: translateX(-50%);
-}
+.cog-card.pos-LEFT { left: 2%; top: 50%; transform: translateY(-50%); }
+.cog-card.pos-RIGHT { right: 2%; top: 50%; transform: translateY(-50%); }
+.cog-card.pos-UP { top: 0%; left: 50%; transform: translateX(-50%); }
+.cog-card.pos-DOWN { bottom: 0%; left: 50%; transform: translateX(-50%); }
 
 .cog-card.hovering {
   border-color: #4ade80;
@@ -1009,7 +1048,6 @@ input[type="range"] {
   border-radius: 99px;
 }
 
-/* FX 畫布與飛行圖示 */
 .fx-canvas {
   position: absolute;
   inset: 0;
@@ -1033,7 +1071,6 @@ input[type="range"] {
   filter: drop-shadow(0 0 16px rgba(251, 191, 36, 0.95));
 }
 
-/* 底部夜市攤位風懸浮收集槽 */
 .bottom-hud {
   position: absolute;
   bottom: max(10px, env(safe-area-inset-bottom));
@@ -1046,10 +1083,8 @@ input[type="range"] {
 .tray-glass {
   padding: 9px 12px;
   border-radius: 20px;
-  background: linear-gradient(180deg, rgba(38, 14, 14, 0.78), rgba(20, 8, 8, 0.8));
+  background: linear-gradient(180deg, rgba(38, 14, 14, 0.88), rgba(20, 8, 8, 0.9));
   border: 1.5px solid var(--nm-border);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(254, 243, 199, 0.12);
   display: flex;
   flex-direction: column;
@@ -1169,12 +1204,10 @@ input[type="range"] {
   object-fit: cover;
 }
 
-/* 出餐慶祝覆蓋層 */
 .celebrate-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(20, 8, 8, 0.86);
-  backdrop-filter: blur(8px);
+  background: rgba(20, 8, 8, 0.88);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1185,7 +1218,7 @@ input[type="range"] {
   text-align: center;
   padding: 22px 28px;
   border-radius: 26px;
-  background: linear-gradient(145deg, rgba(60, 18, 16, 0.95), rgba(28, 10, 10, 0.95));
+  background: linear-gradient(145deg, rgba(60, 18, 16, 0.96), rgba(28, 10, 10, 0.96));
   border: 2px solid var(--gold-normal);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
 }
@@ -1212,7 +1245,6 @@ input[type="range"] {
   to { transform: scale(1); opacity: 1; }
 }
 
-/* 結算頁與彈窗 */
 .stall-rank-banner {
   background: linear-gradient(135deg, rgba(185, 28, 28, 0.45), rgba(245, 158, 11, 0.35));
   border: 1.5px solid var(--gold-normal);
@@ -1311,7 +1343,6 @@ input[type="range"] {
   margin-top: 18px;
 }
 
-/* 50 道料理收集圖鑑 */
 .gallery-tabs {
   display: flex;
   gap: 6px;
@@ -1396,10 +1427,12 @@ input[type="range"] {
   margin-top: 2px;
 }
 
-/* === 吱吱復健電子名片延伸資源區塊（獨立命名空間封裝，保留原始設計、Base64 圖片與連結） === */
+/* =====================================================
+   吱吱復健電子名片延伸資源區塊（台灣夜市深色暖金主題配色）
+   ===================================================== */
 .relive-card-wrap {
-  margin-top: 28px;
-  color: #43392f;
+  margin-top: 24px;
+  color: #fffbeb;
   font-family: system-ui, -apple-system, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
   line-height: 1.72;
 }
@@ -1407,73 +1440,82 @@ input[type="range"] {
 .relive-card-wrap a { color: inherit; text-decoration: none; }
 .relive-card-wrap .section-label {
   margin: 12px 0 14px; display: flex; align-items: center; gap: 12px;
-  color: #f3dfc8; font-size: 14px; font-weight: 700; letter-spacing: .06em;
+  color: #fde68a; font-size: 14px; font-weight: 800; letter-spacing: .06em;
 }
-.relive-card-wrap .section-label:after { content: ""; height: 1px; flex: 1; background: #5a412e; }
+.relive-card-wrap .section-label:after { content: ""; height: 1px; flex: 1; background: rgba(251, 191, 36, 0.32); }
 .relive-card-wrap .sections { display: grid; gap: 14px; }
 .relive-card-wrap .panel {
-  background: #fffdfa; border: 1px solid #e7dac8; border-radius: 20px;
-  box-shadow: 0 7px 24px rgba(0,0,0,0.22); overflow: hidden; color: #43392f;
+  background: linear-gradient(160deg, rgba(46, 18, 15, 0.94), rgba(26, 10, 9, 0.96));
+  border: 1.5px solid rgba(251, 191, 36, 0.32);
+  border-radius: 20px;
+  box-shadow: 0 8px 26px rgba(0,0,0,0.4);
+  overflow: hidden;
+  color: #fffbeb;
 }
 .relive-card-wrap .panel summary {
   list-style: none; padding: 18px 22px; display: flex; align-items: center; gap: 15px; cursor: pointer;
 }
 .relive-card-wrap .panel summary::-webkit-details-marker { display: none; }
-.relive-card-wrap .panel summary:hover { background: #f9f5ed; }
+.relive-card-wrap .panel summary:hover { background: rgba(251, 191, 36, 0.08); }
 .relive-card-wrap .symbol {
   width: 45px; height: 45px; display: flex; align-items: center; justify-content: center;
-  border-radius: 14px; background: #f0e6d8; color: #80634a; flex-shrink: 0;
+  border-radius: 14px; background: rgba(245, 158, 11, 0.18); border: 1px solid rgba(251, 191, 36, 0.38);
+  color: #fbbf24; flex-shrink: 0;
 }
-.relive-card-wrap .panel:nth-child(2) .symbol { background: #eff0e7; color: #697655; }
-.relive-card-wrap .panel-title { font-size: 17px; font-weight: 800; color: #43392f; }
-.relive-card-wrap .panel-sub { font-size: 13px; color: #7f7163; margin-top: 2px; }
+.relive-card-wrap .panel:nth-child(2) .symbol { background: rgba(74, 222, 128, 0.14); border-color: rgba(74, 222, 128, 0.35); color: #4ade80; }
+.relive-card-wrap .panel-title { font-size: 17px; font-weight: 800; color: #fffbeb; }
+.relive-card-wrap .panel-sub { font-size: 13px; color: #fde68a; opacity: 0.85; margin-top: 2px; }
 .relive-card-wrap .chev {
   margin-left: auto; display: block; width: 10px; height: 10px;
-  border-right: 2px solid #80634a; border-bottom: 2px solid #80634a;
+  border-right: 2px solid #fbbf24; border-bottom: 2px solid #fbbf24;
   transform: rotate(45deg); margin-right: 5px; transition: transform .2s;
 }
 .relive-card-wrap .panel[open] .chev { transform: rotate(225deg); }
-.relive-card-wrap .panel-content { padding: 0 22px 22px; border-top: 1px solid #f1e9df; }
-.relive-card-wrap .panel-content > p { font-size: 14px; color: #695f54; margin: 16px 0; }
+.relive-card-wrap .panel-content { padding: 0 22px 22px; border-top: 1px solid rgba(251, 191, 36, 0.18); }
+.relive-card-wrap .panel-content > p { font-size: 14px; color: rgba(255, 251, 235, 0.86); margin: 16px 0; }
 .relive-card-wrap .feature {
-  background: #f7f3eb; padding: 16px; border-radius: 14px; border: 1px solid #eae0d1; margin-bottom: 12px;
+  background: rgba(18, 6, 6, 0.55); padding: 16px; border-radius: 14px;
+  border: 1px solid rgba(251, 191, 36, 0.24); margin-bottom: 12px;
 }
 .relive-card-wrap .feature:last-child { margin-bottom: 0; }
-.relive-card-wrap .feature h3 { margin: 0 0 6px; font-size: 16px; color: #43392f; }
-.relive-card-wrap .muted { color: #7f7163; font-size: 13px; }
+.relive-card-wrap .feature h3 { margin: 0 0 6px; font-size: 16px; color: #fbbf24; }
+.relive-card-wrap .muted { color: rgba(254, 243, 199, 0.82); font-size: 13px; }
 .relive-card-wrap .linkrow { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 13px; }
 .relive-card-wrap .linkrow a {
-  display: inline-flex; padding: 9px 13px; border-radius: 10px; border: 1px solid #cdbda7;
-  background: #fff; color: #5d4c39; font-size: 13px; font-weight: 700; transition: background .15s;
+  display: inline-flex; padding: 9px 14px; border-radius: 10px;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(245, 158, 11, 0.15); color: #fffbeb;
+  font-size: 13px; font-weight: 800; transition: background .15s, border-color .15s;
 }
-.relive-card-wrap .linkrow a:hover { background: #f2e8da; }
-.relive-card-wrap .smallprint { color: #857b6c; font-size: 12px; margin: 12px 0 0; }
+.relive-card-wrap .linkrow a:hover { background: rgba(245, 158, 11, 0.32); border-color: #fbbf24; }
+.relive-card-wrap .smallprint { color: rgba(254, 243, 199, 0.65); font-size: 12px; margin: 12px 0 0; }
 .relive-card-wrap .card-course-mini {
   display: grid; grid-template-columns: minmax(150px, 200px) minmax(0, 1fr);
   gap: 18px; align-items: center; margin-top: 18px;
 }
 .relive-card-wrap .card-course-photo {
   width: 100%; aspect-ratio: 1; object-fit: cover; display: block;
-  border-radius: 14px; border: 1px solid #eadccc;
+  border-radius: 14px; border: 1.5px solid rgba(251, 191, 36, 0.4);
 }
 .relive-card-wrap .card-course-body { min-width: 0; }
 .relive-card-wrap .card-paid {
-  display: inline-block; border-radius: 999px; border: 1px solid #c8d4c0;
-  background: #e9f0e6; color: #36513e; padding: 3px 10px; font-size: 12px; font-weight: 800;
+  display: inline-block; border-radius: 999px; border: 1px solid rgba(74, 222, 128, 0.45);
+  background: rgba(34, 197, 94, 0.18); color: #86efac; padding: 3px 10px; font-size: 12px; font-weight: 800;
 }
-.relive-card-wrap .card-course-body h3 { font-size: 18px; margin: 8px 0 6px; line-height: 1.45; color: #43392f; }
-.relive-card-wrap .card-course-body p { font-size: 13px; color: #695f54; margin: 0 0 13px; line-height: 1.75; }
+.relive-card-wrap .card-course-body h3 { font-size: 18px; margin: 8px 0 6px; line-height: 1.45; color: #fffbeb; }
+.relive-card-wrap .card-course-body p { font-size: 13px; color: rgba(254, 243, 199, 0.85); margin: 0 0 13px; line-height: 1.75; }
 .relive-card-wrap .card-primary-link {
   display: inline-flex; justify-content: center; text-align: center; align-items: center;
-  background: #6b4a33; color: #fff !important; padding: 10px 14px; border-radius: 10px; font-weight: 800; font-size: 13px;
+  background: linear-gradient(135deg, #f59e0b, #fbbf24); color: #1f0c04 !important;
+  padding: 10px 16px; border-radius: 10px; font-weight: 900; font-size: 13px;
 }
-.relive-card-wrap .card-primary-link:hover { background: #513520; }
-.relive-card-wrap .card-mini-note { margin-top: 9px; color: #7b6754; font-size: 11.5px; line-height: 1.75; }
+.relive-card-wrap .card-primary-link:hover { background: linear-gradient(135deg, #fbbf24, #fde047); }
+.relive-card-wrap .card-mini-note { margin-top: 9px; color: rgba(254, 243, 199, 0.72); font-size: 11.5px; line-height: 1.75; }
 .relive-card-wrap .card-tools-grid {
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin: 15px 0;
 }
 .relive-card-wrap .card-tool {
-  background: #fcfaf6; border: 1px solid #e9dece; border-radius: 12px;
+  background: rgba(18, 6, 6, 0.6); border: 1px solid rgba(251, 191, 36, 0.28); border-radius: 12px;
   padding: 10px 6px 9px; text-align: center; min-width: 0;
 }
 .relive-card-wrap .card-tool img {
@@ -1482,8 +1524,10 @@ input[type="range"] {
   -webkit-mask-image: radial-gradient(ellipse 73% 73% at center, #000 68%, transparent 100%);
   mask-image: radial-gradient(ellipse 73% 73% at center, #000 68%, transparent 100%);
 }
-.relive-card-wrap .card-tool span { font-size: 12px; line-height: 1.45; font-weight: 750; display: block; color: #493728; }
-.relive-card-wrap .card-tool-links a:first-child { background: #6b4a33; color: #fff; border-color: #6b4a33; }
+.relive-card-wrap .card-tool span { font-size: 12px; line-height: 1.45; font-weight: 800; display: block; color: #fde68a; }
+.relive-card-wrap .card-tool-links a:first-child {
+  background: linear-gradient(135deg, #f59e0b, #fbbf24); color: #1f0c04; border-color: #fbbf24;
+}
 @media (max-width: 550px) {
   .relive-card-wrap .card-course-mini { grid-template-columns: 110px minmax(0, 1fr); gap: 12px; align-items: start; }
   .relive-card-wrap .card-course-body h3 { font-size: 16px; }
@@ -1493,4 +1537,84 @@ input[type="range"] {
 @media (max-width: 380px) {
   .relive-card-wrap .card-course-mini { grid-template-columns: 1fr; }
   .relive-card-wrap .card-course-photo { width: 150px; margin: 0 auto; }
+}
+
+/* === V2.2 遊戲選關卡式 4 張水彩插畫卡片 === */
+.preset-status-badge {
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  padding: 4px 12px;
+  border-radius: 999px;
+}
+.stage-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+.stage-card {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  background: rgba(18, 9, 9, 0.78);
+  border: 2px solid rgba(251, 191, 36, 0.22);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  color: var(--text-main);
+}
+.stage-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(251, 191, 36, 0.65);
+}
+.stage-card.active {
+  border-color: #fbbf24;
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.26), 0 12px 28px rgba(0, 0, 0, 0.55);
+  background: rgba(45, 21, 12, 0.92);
+}
+.stage-thumb-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #140808;
+}
+.stage-thumb-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.stage-pill {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 900;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.45);
+}
+.stage-pill.green { background: rgba(22, 163, 74, 0.92); }
+.stage-pill.yellow { background: rgba(217, 119, 6, 0.94); }
+.stage-pill.blue { background: rgba(2, 132, 199, 0.92); }
+.stage-pill.red { background: rgba(220, 38, 38, 0.92); }
+.stage-card-body {
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.stage-card-body strong {
+  font-size: 1.04rem;
+  color: #fffbeb;
+}
+.stage-card-body p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: rgba(254, 243, 199, 0.78);
 }

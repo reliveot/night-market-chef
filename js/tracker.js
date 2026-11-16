@@ -30,22 +30,44 @@ export class InputTracker {
   }
 
   async initHandLandmarker() {
-    if (this.handLandmarker) return;
-    const vision = await FilesetResolver.forVisionTasks(
-      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
-    );
-    this.handLandmarker = await HandLandmarker.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath:
-          'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
-        delegate: 'GPU',
-      },
-      runningMode: 'VIDEO',
-      numHands: 1,
-      minHandDetectionConfidence: 0.5,
-      minHandPresenceConfidence: 0.5,
-      minTrackingConfidence: 0.5,
-    });
+    if (this.handLandmarker) return true;
+    try {
+      const vision = await FilesetResolver.forVisionTasks(
+        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
+      );
+      try {
+        this.handLandmarker = await HandLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath:
+              'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+            delegate: 'GPU',
+          },
+          runningMode: 'VIDEO',
+          numHands: 1,
+          minHandDetectionConfidence: 0.45,
+          minHandPresenceConfidence: 0.45,
+          minTrackingConfidence: 0.45,
+        });
+      } catch {
+        // iPad / iOS Safari 若 GPU delegate 失敗，自動切換為 CPU delegate
+        this.handLandmarker = await HandLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath:
+              'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+            delegate: 'CPU',
+          },
+          runningMode: 'VIDEO',
+          numHands: 1,
+          minHandDetectionConfidence: 0.45,
+          minHandPresenceConfidence: 0.45,
+          minTrackingConfidence: 0.45,
+        });
+      }
+      return true;
+    } catch (err) {
+      console.warn('HandLandmarker init error:', err);
+      return false;
+    }
   }
 
   async start(mode, options = {}) {
@@ -57,23 +79,54 @@ export class InputTracker {
     this.inferCostHistory = [];
 
     if (mode === 'camera') {
-      await this.initHandLandmarker();
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
-        audio: false,
-      });
-      this.videoEl.srcObject = this.stream;
-      await this.videoEl.play();
+      // 重要：於使用者點擊手勢當下立即請求攝影機並播放，避免 iPad Safari 因等待模型下載而使播放權限過期
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera API unavailable');
+      }
 
-      const intervalMs = this.lowPerfMode ? 100 : 66; // 10 FPS 或 15 FPS
-      this.inferTimer = setInterval(() => this._runCameraInference(), intervalMs);
+      try {
+        this.stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false,
+        });
+      } catch {
+        this.stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+      }
+
+      this.videoEl.setAttribute('playsinline', '');
+      this.videoEl.setAttribute('webkit-playsinline', '');
+      this.videoEl.muted = true;
+      this.videoEl.srcObject = this.stream;
+      this.videoEl.style.display = 'block';
+
+      try {
+        await this.videoEl.play();
+      } catch {
+        this.videoEl.onloadedmetadata = () => {
+          this.videoEl.play().catch(() => {});
+        };
+      }
+
+      // 鏡頭畫面已成功顯示後，再非同步啟動 AI 手部模型推論（不阻塞鏡頭畫面）
+      this.initHandLandmarker().then((ready) => {
+        if (!this.isRunning || this.mode !== 'camera') return;
+        if (ready) {
+          const intervalMs = this.lowPerfMode ? 100 : 66;
+          this.inferTimer = setInterval(() => this._runCameraInference(), intervalMs);
+        } else {
+          this.callbacks.onModelFallback?.();
+        }
+      });
     }
   }
 
   setLowPerf(enabled) {
     if (this.lowPerfMode === enabled) return;
     this.lowPerfMode = enabled;
-    if (this.isRunning && this.mode === 'camera') {
+    if (this.isRunning && this.mode === 'camera' && this.handLandmarker) {
       clearInterval(this.inferTimer);
       this.inferTimer = setInterval(() => this._runCameraInference(), enabled ? 100 : 66);
     }
@@ -93,10 +146,13 @@ export class InputTracker {
       this.stream.getTracks().forEach((t) => t.stop());
       this.stream = null;
     }
+    if (this.videoEl) {
+      this.videoEl.srcObject = null;
+    }
   }
 
   async _runCameraInference() {
-    if (!this.isRunning || this.isInferencing || !this.videoEl || this.videoEl.readyState < 2) return;
+    if (!this.isRunning || this.isInferencing || !this.handLandmarker || !this.videoEl || this.videoEl.readyState < 2) return;
     this.isInferencing = true;
 
     try {
@@ -121,7 +177,6 @@ export class InputTracker {
       if (result.landmarks && result.landmarks.length > 0) {
         this.lostFrames = 0;
         const lm = result.landmarks[0];
-        // 取手掌中心質心 (Wrist 0, Index MCP 5, Pinky MCP 17)
         const rawX = (lm[0].x + lm[5].x + lm[17].x) / 3;
         const rawY = (lm[0].y + lm[5].y + lm[17].y) / 3;
 

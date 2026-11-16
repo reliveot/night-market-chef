@@ -43,21 +43,21 @@ export class OneEuroFilter {
 }
 
 export const DIR_VECTORS = {
-  UP:    { dx:  0, dy: -1, glyph: '↑', opposite: 'DOWN' },
-  UR:    { dx:  0.7071, dy: -0.7071, glyph: '↗', opposite: 'DL' },
-  RIGHT: { dx:  1, dy:  0, glyph: '→', opposite: 'LEFT' },
-  DR:    { dx:  0.7071, dy:  0.7071, glyph: '↘', opposite: 'UL' },
-  DOWN:  { dx:  0, dy:  1, glyph: '↓', opposite: 'UP' },
-  DL:    { dx: -0.7071, dy:  0.7071, glyph: '↙', opposite: 'UR' },
-  LEFT:  { dx: -1, dy:  0, glyph: '←', opposite: 'RIGHT' },
-  UL:    { dx: -0.7071, dy: -0.7071, glyph: '↖', opposite: 'DR' },
+  UP:    { dx:  0,      dy: -1,      glyph: '↑', deg: -90,  opposite: 'DOWN' },
+  UR:    { dx:  0.7071, dy: -0.7071, glyph: '↗', deg: -45,  opposite: 'DL' },
+  RIGHT: { dx:  1,      dy:  0,      glyph: '→', deg: 0,    opposite: 'LEFT' },
+  DR:    { dx:  0.7071, dy:  0.7071, glyph: '↘', deg: 45,   opposite: 'UL' },
+  DOWN:  { dx:  0,      dy:  1,      glyph: '↓', deg: 90,   opposite: 'UP' },
+  DL:    { dx: -0.7071, dy:  0.7071, glyph: '↙', deg: 135,  opposite: 'UR' },
+  LEFT:  { dx: -1,      dy:  0,      glyph: '←', deg: 180,  opposite: 'RIGHT' },
+  UL:    { dx: -0.7071, dy: -0.7071, glyph: '↖', deg: -135, opposite: 'DR' },
 };
 
 /**
- * 動作判定引擎：
- * 1. DIRECTION：非固定起點動態投影向量判定（支援慢速、小幅度與折返揮動）
- * 2. HOLD：穩定維持 3 秒（允許自然顫抖半徑與 400ms 瞬跳寬限）
- * 3. STIR：自由翻炒（參考點滑動法 Reference Anchor Stepping，不限方向累積距離）
+ * 動作與認知判定引擎 V2.0：
+ * 1. DIRECTION：非固定起點動態投影向量判定（支援慢速、小幅度、折返揮動與兩刀連擊）
+ * 2. SPOILED  ：壞食材抑制控制 Go / No-Go（忍住不揮動 2.5 秒自動掃進垃圾桶）
+ * 3. STIR     ：自由翻炒（參考點滑動法 Reference Anchor Stepping，僅在主動移動時回傳 isMoving: true 觸發震動）
  */
 export class GestureJudge {
   constructor() {
@@ -77,7 +77,6 @@ export class GestureJudge {
     this.stableSince = null;
 
     this.holdElapsedMs = 0;
-    this.holdOutGraceMs = 0;
     this.lastFrameTime = null;
 
     this.stirAccumulated = 0;
@@ -91,7 +90,7 @@ export class GestureJudge {
     this.anchor = null;
     this.stableSince = null;
     this.lastFrameTime = null;
-    this.stirRefPoint = null; // 保留 stirAccumulated 與 holdElapsedMs，恢復後可繼續累積
+    this.stirRefPoint = null;
   }
 
   updatePoint(rawX, rawY, nowMs, taskConfig) {
@@ -104,29 +103,29 @@ export class GestureJudge {
     if (nowMs < this.cooldownUntil) {
       this.anchor = { x, y };
       this.stirRefPoint = { x, y };
-      return { status: 'cooldown', x, y, progress: 0 };
+      return { status: 'cooldown', x, y, progress: 0, isMoving: false };
     }
 
     if (!this.stableSince) {
       this.stableSince = nowMs;
       this.anchor = { x, y };
       this.stirRefPoint = { x, y };
-      return { status: 'stabilizing', x, y, progress: 0 };
+      return { status: 'stabilizing', x, y, progress: 0, isMoving: false };
     }
-    if (nowMs - this.stableSince < 180) {
+    if (nowMs - this.stableSince < 140) {
       this.anchor = { x, y };
       this.stirRefPoint = { x, y };
-      return { status: 'stabilizing', x, y, progress: 0 };
+      return { status: 'stabilizing', x, y, progress: 0, isMoving: false };
     }
 
     if (taskConfig.type === 'DIRECTION') {
       return this._evalDirection(x, y, nowMs, taskConfig.requiredDirKey);
-    } else if (taskConfig.type === 'HOLD') {
-      return this._evalHold(x, y, dtMs);
+    } else if (taskConfig.type === 'SPOILED') {
+      return this._evalSpoiled(x, y, dtMs, nowMs);
     } else if (taskConfig.type === 'STIR') {
       return this._evalStir(x, y, nowMs);
     }
-    return { status: 'idle', x, y, progress: 0 };
+    return { status: 'idle', x, y, progress: 0, isMoving: false };
   }
 
   _evalDirection(x, y, nowMs, dirKey) {
@@ -149,9 +148,10 @@ export class GestureJudge {
       const angleDeg = (Math.acos(Math.min(1, Math.max(-1, cosTheta))) * 180) / Math.PI;
       if (angleDeg <= this.angleToleranceDeg) {
         const startAnchor = { ...this.anchor };
+        const swipeAngleRad = Math.atan2(vy, vx);
         this.anchor = { x, y };
-        this.cooldownUntil = nowMs + 380;
-        return { status: 'completed', x, y, startAnchor, progress: 1 };
+        this.cooldownUntil = nowMs + 340;
+        return { status: 'completed', x, y, startAnchor, swipeAngleRad, progress: 1 };
       } else {
         this.anchor = { x, y };
       }
@@ -160,25 +160,31 @@ export class GestureJudge {
     return { status: 'tracking', x, y, progress };
   }
 
-  _evalHold(x, y, dtMs) {
+  _evalSpoiled(x, y, dtMs, nowMs) {
     if (!this.anchor) this.anchor = { x, y };
     const dist = Math.hypot(x - this.anchor.x, y - this.anchor.y);
-    const holdRadius = Math.max(0.055, this.distThreshold * 0.42);
+    const swipeTrigger = Math.max(0.10, this.distThreshold * 0.72);
 
-    if (dist <= holdRadius) {
-      this.holdElapsedMs += dtMs;
-      this.holdOutGraceMs = 0;
-    } else {
-      this.holdOutGraceMs += dtMs;
-      if (this.holdOutGraceMs > 400) {
-        this.holdElapsedMs = 0;
-        this.anchor = { x, y };
-      }
+    // 若不小心大幅揮動，代表誤切壞食材
+    if (dist >= swipeTrigger) {
+      this.holdElapsedMs = 0;
+      this.anchor = { x, y };
+      this.cooldownUntil = nowMs + 450;
+      return { status: 'spoiled_cut', x, y, progress: 0, remainSec: 2.5 };
     }
 
-    const progress = Math.min(1, this.holdElapsedMs / 3000);
-    if (this.holdElapsedMs >= 3000) {
+    // 緩慢微調手部位置不影響忍耐計時
+    this.anchor = {
+      x: this.anchor.x * 0.92 + x * 0.08,
+      y: this.anchor.y * 0.92 + y * 0.08,
+    };
+    this.holdElapsedMs += dtMs;
+
+    const targetMs = 2500;
+    const progress = Math.min(1, this.holdElapsedMs / targetMs);
+    if (this.holdElapsedMs >= targetMs) {
       this.holdElapsedMs = 0;
+      this.cooldownUntil = nowMs + 360;
       return { status: 'completed', x, y, progress: 1, remainSec: 0 };
     }
     return {
@@ -186,7 +192,7 @@ export class GestureJudge {
       x,
       y,
       progress,
-      remainSec: Math.max(0, (3000 - this.holdElapsedMs) / 1000),
+      remainSec: Math.max(0, (targetMs - this.holdElapsedMs) / 1000),
     };
   }
 
@@ -197,8 +203,8 @@ export class GestureJudge {
     }
 
     const stepDist = Math.hypot(x - this.stirRefPoint.x, y - this.stirRefPoint.y);
-    const minStepDeadzone = Math.max(0.015, this.distThreshold * 0.14);
-    const maxJumpClamp = 0.30;
+    const minStepDeadzone = Math.max(0.012, this.distThreshold * 0.11);
+    const maxJumpClamp = 0.32;
 
     if (stepDist > maxJumpClamp) {
       this.stirRefPoint = { x, y };
@@ -209,12 +215,12 @@ export class GestureJudge {
     }
 
     const progress = this._getStirProgress();
-    const isMoving = nowMs - this.lastStirActiveMs < 260;
+    const isMoving = nowMs - this.lastStirActiveMs < 150;
 
     if (progress >= 1) {
       this.stirAccumulated = 0;
       this.cooldownUntil = nowMs + 380;
-      return { status: 'completed', x, y, progress: 1, isMoving: true };
+      return { status: 'completed', x, y, progress: 1, isMoving: false };
     }
 
     return { status: 'tracking', x, y, progress, isMoving };

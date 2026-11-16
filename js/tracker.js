@@ -1,17 +1,14 @@
 import { FilesetResolver, HandLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm';
 
 export class InputTracker {
-  constructor(videoEl, overlayCanvas, stageEl, callbacks) {
+  constructor(videoEl, stageEl, callbacks) {
     this.videoEl = videoEl;
-    this.overlayCanvas = overlayCanvas;
-    this.overlayCtx = overlayCanvas.getContext('2d');
     this.stageEl = stageEl;
     this.callbacks = callbacks;
 
     this.mode = 'camera'; // 'camera' | 'touch'
     this.mirrored = true;
     this.lowPerfMode = false;
-    this.preferredHand = 'any'; // 'any' | 'Left' | 'Right'
 
     this.handLandmarker = null;
     this.stream = null;
@@ -56,7 +53,6 @@ export class InputTracker {
     this.mode = mode;
     this.mirrored = options.mirrored ?? true;
     this.lowPerfMode = options.lowPerf ?? false;
-    this.preferredHand = options.preferredHand ?? 'any';
     this.isRunning = true;
     this.inferCostHistory = [];
 
@@ -68,9 +64,6 @@ export class InputTracker {
       });
       this.videoEl.srcObject = this.stream;
       await this.videoEl.play();
-
-      this.overlayCanvas.width = 160;
-      this.overlayCanvas.height = 120;
 
       const intervalMs = this.lowPerfMode ? 100 : 66; // 10 FPS 或 15 FPS
       this.inferTimer = setInterval(() => this._runCameraInference(), intervalMs);
@@ -92,6 +85,10 @@ export class InputTracker {
       clearInterval(this.inferTimer);
       this.inferTimer = null;
     }
+    if (this.holdHeartbeat) {
+      clearInterval(this.holdHeartbeat);
+      this.holdHeartbeat = null;
+    }
     if (this.stream) {
       this.stream.getTracks().forEach((t) => t.stop());
       this.stream = null;
@@ -99,7 +96,7 @@ export class InputTracker {
   }
 
   async _runCameraInference() {
-    if (!this.isRunning || this.isInferencing || this.videoEl.readyState < 2) return;
+    if (!this.isRunning || this.isInferencing || !this.videoEl || this.videoEl.readyState < 2) return;
     this.isInferencing = true;
 
     try {
@@ -108,7 +105,6 @@ export class InputTracker {
       const result = this.handLandmarker.detectForVideo(this.offscreenCanvas, t0);
       const inferCostMs = performance.now() - t0;
 
-      // 實測低階手機效能：連續 12 次推論平均超過 58ms 自動降級為省電順暢模式
       if (!this.lowPerfMode && !this.autoDowngraded) {
         this.inferCostHistory.push(inferCostMs);
         if (this.inferCostHistory.length >= 12) {
@@ -122,8 +118,6 @@ export class InputTracker {
         }
       }
 
-      this.overlayCtx.clearRect(0, 0, this.overlayCanvas.width, this.overlayCanvas.height);
-
       if (result.landmarks && result.landmarks.length > 0) {
         this.lostFrames = 0;
         const lm = result.landmarks[0];
@@ -131,14 +125,9 @@ export class InputTracker {
         const rawX = (lm[0].x + lm[5].x + lm[17].x) / 3;
         const rawY = (lm[0].y + lm[5].y + lm[17].y) / 3;
 
-        this.overlayCtx.fillStyle = '#38b000';
-        this.overlayCtx.beginPath();
-        this.overlayCtx.arc(rawX * this.overlayCanvas.width, rawY * this.overlayCanvas.height, 8, 0, Math.PI * 2);
-        this.overlayCtx.fill();
-
         const normX = this.mirrored ? 1.0 - rawX : rawX;
         const normY = rawY;
-        const nearEdge = rawX < 0.06 || rawX > 0.94 || rawY < 0.06 || rawY > 0.94;
+        const nearEdge = rawX < 0.05 || rawX > 0.95 || rawY < 0.05 || rawY > 0.95;
 
         this.callbacks.onPoint(normX, normY, performance.now(), nearEdge, inferCostMs);
       } else {
@@ -156,42 +145,43 @@ export class InputTracker {
 
   _initPointerEvents() {
     let isPointerDown = false;
-    let holdHeartbeat = null;
     let lastPt = { x: 0.5, y: 0.5 };
 
     const getNormPos = (e) => {
       const rect = this.stageEl.getBoundingClientRect();
       return {
-        x: Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)),
-        y: Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height)),
+        x: Math.min(1, Math.max(0, (e.clientX - rect.left) / Math.max(1, rect.width))),
+        y: Math.min(1, Math.max(0, (e.clientY - rect.top) / Math.max(1, rect.height))),
       };
     };
 
     this.stageEl.addEventListener('pointerdown', (e) => {
-      if (!this.isRunning || this.mode !== 'touch') return;
+      if (!this.isRunning) return;
       if (e.target.closest('button')) return;
       isPointerDown = true;
       lastPt = getNormPos(e);
       this.callbacks.onPoint(lastPt.x, lastPt.y, performance.now(), false, 0);
 
-      clearInterval(holdHeartbeat);
-      holdHeartbeat = setInterval(() => {
-        if (isPointerDown && this.isRunning && this.mode === 'touch') {
+      clearInterval(this.holdHeartbeat);
+      this.holdHeartbeat = setInterval(() => {
+        if (isPointerDown && this.isRunning) {
           this.callbacks.onPoint(lastPt.x, lastPt.y, performance.now(), false, 0);
         }
       }, 50);
     });
 
     this.stageEl.addEventListener('pointermove', (e) => {
-      if (!isPointerDown || !this.isRunning || this.mode !== 'touch') return;
+      if (!this.isRunning) return;
       lastPt = getNormPos(e);
-      this.callbacks.onPoint(lastPt.x, lastPt.y, performance.now(), false, 0);
+      if (isPointerDown || this.mode === 'touch') {
+        this.callbacks.onPoint(lastPt.x, lastPt.y, performance.now(), false, 0);
+      }
     });
 
     const endPointer = () => {
       if (!isPointerDown) return;
       isPointerDown = false;
-      clearInterval(holdHeartbeat);
+      clearInterval(this.holdHeartbeat);
       if (this.mode === 'touch') this.callbacks.onLost();
     };
 

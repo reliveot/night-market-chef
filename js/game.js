@@ -5,6 +5,13 @@ import { AssetManager } from './preloader.js';
 
 const STORAGE_KEY_COLLECTION = 'tw_night_market_chef_unlocked_v1';
 
+const PREP_LABELS = {
+  cut:      { icon: '🔪', tag: '切菜刀法', callout: '🔪 一刀兩斷！', anim: 'anim-cut' },
+  sprinkle: { icon: '🧂', tag: '撒粉淋醬', callout: '🧂 香氣提味！', anim: 'anim-sprinkle' },
+  pour:     { icon: '🥣', tag: '鮮料下鍋', callout: '🥣 鮮料下鍋！', anim: 'anim-pour' },
+  flip:     { icon: '🔥', tag: '帥氣翻面', callout: '🔥 帥氣翻面！', anim: 'anim-flip' },
+};
+
 class SoundEngine {
   constructor() {
     this.ctx = null;
@@ -22,30 +29,58 @@ class SoundEngine {
     }
   }
 
-  playTone(freq = 520, dur = 0.12, type = 'triangle') {
+  playTone(freq = 520, dur = 0.14, type = 'triangle', gainVal = 0.15) {
     if (!this.soundEnabled || !this.ctx) return;
     try {
+      const now = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       osc.type = type;
-      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-      gain.gain.setValueAtTime(0.16, this.ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + dur);
+      osc.frequency.setValueAtTime(freq, now);
+      gain.gain.setValueAtTime(gainVal, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
       osc.connect(gain);
       gain.connect(this.ctx.destination);
-      osc.start();
-      osc.stop(this.ctx.currentTime + dur);
+      osc.start(now);
+      osc.stop(now + dur + 0.01);
     } catch {}
   }
 
-  playSliceSuccess() {
-    this.playTone(587.33, 0.1, 'sine');
-    setTimeout(() => this.playTone(880, 0.15, 'triangle'), 65);
+  playPrepSound(prepType = 'cut', isReverse = false) {
+    if (!this.soundEnabled) return;
+    this.unlock();
+    if (prepType === 'sprinkle') {
+      [880, 1174.6, 1396.9].forEach((f, i) => setTimeout(() => this.playTone(f, 0.1, 'sine', 0.12), i * 45));
+    } else if (prepType === 'pour') {
+      [392, 523.25, 659.25].forEach((f, i) => setTimeout(() => this.playTone(f, 0.12, 'sine', 0.14), i * 50));
+    } else if (prepType === 'flip') {
+      this.playTone(340, 0.12, 'triangle', 0.16);
+      setTimeout(() => this.playTone(680, 0.16, 'triangle', 0.16), 60);
+    } else {
+      // cut
+      this.playTone(isReverse ? 640 : 480, 0.14, 'sawtooth', 0.15);
+      setTimeout(() => this.playTone(987.77, 0.16, 'sine', 0.14), 50);
+    }
+  }
+
+  playSpoiledSweep() {
+    if (!this.soundEnabled) return;
+    this.unlock();
+    [523.25, 659.25, 783.99].forEach((f, i) => setTimeout(() => this.playTone(f, 0.14, 'sine', 0.13), i * 60));
+  }
+
+  playWrongBuzz() {
+    if (!this.soundEnabled) return;
+    this.unlock();
+    this.playTone(220, 0.18, 'sawtooth', 0.12);
+    setTimeout(() => this.playTone(185, 0.22, 'sawtooth', 0.12), 90);
   }
 
   playDishComplete() {
+    if (!this.soundEnabled) return;
+    this.unlock();
     [523.25, 659.25, 783.99, 1046.5].forEach((f, idx) => {
-      setTimeout(() => this.playTone(f, 0.18, 'triangle'), idx * 85);
+      setTimeout(() => this.playTone(f, 0.2, 'triangle', 0.16), idx * 80);
     });
   }
 
@@ -55,7 +90,7 @@ class SoundEngine {
       window.speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(text);
       utter.lang = 'zh-TW';
-      utter.rate = 1.05;
+      utter.rate = 1.06;
       window.speechSynthesis.speak(utter);
     } catch {}
   }
@@ -69,17 +104,20 @@ class NightMarketGame {
     this.assets = new AssetManager();
 
     this.settings = {
-      inputMode: 'camera',
-      gameMode: 'dishes',
+      trainingMode: 'action', // 'action' | 'cognitive'
+      cogChoices: 2,          // 2 | 3 | 4
+      inputMode: 'camera',    // 'camera' | 'touch'
+      gameMode: 'dishes',     // 'dishes' | 'timed' | 'endless'
+      categoryFilter: 'ALL',
       targetDishes: 3,
       timeLimitSec: 60,
-      dirCount: 4,
-      dirRule: 'normal',
+      allowedDirs: ['UP', 'DOWN', 'LEFT', 'RIGHT'],
+      dirRule: 'normal',      // 'normal' | 'reverse' | 'mixed'
       angleTol: 45,
-      enableHold: false,
-      enableStir: false,
+      enableSpoiled: false,
+      enableDoubleCut: false,
+      enableStir: true,
       stirMult: 5,
-      specialProb: 0.25,
       distThreshold: 0.18,
       mirrored: true,
       sound: true,
@@ -87,7 +125,7 @@ class NightMarketGame {
       lowPerf: false,
     };
 
-    this.state = 'MENU'; // MENU | PLAYING | CELEBRATING | PAUSED | GAMEOVER | CALIBRATING
+    this.state = 'MENU'; // MENU | PLAYING | ANIMATING | CELEBRATING | GAMEOVER | CALIBRATING
     this.stats = this._emptyStats();
     this.recipeQueue = [];
     this.currentDish = null;
@@ -95,21 +133,32 @@ class NightMarketGame {
     this.currentSteps = [];
     this.stepIndex = 0;
     this.currentTask = null;
-    this.consecutiveSpecials = 0;
 
     this.timerInterval = null;
     this.remainSec = 0;
     this.startTimeMs = 0;
-    this.pausedElapsedMs = 0;
-    this.pauseStartedAt = 0;
     this.celebrateTimer = null;
+    this.lastVibrateAt = 0;
+
+    // 視覺特效陣列（光軌、光刃、火花、波紋、蒸氣、浮動文字）
+    this.cursorPos = null;
+    this.trail = [];
+    this.slashes = [];
+    this.sparks = [];
+    this.rings = [];
+    this.steams = [];
+    this.callouts = [];
+
+    // 認知模式第 5 步懸停選取狀態
+    this.cogHoveredId = null;
+    this.cogHoverElapsedMs = 0;
+    this.cogLastTickMs = null;
 
     this.unlockedSet = this._loadCollection();
 
     this._initDOM();
     this.tracker = new InputTracker(
       document.getElementById('webcamVideo'),
-      document.getElementById('camOverlayCanvas'),
       document.getElementById('playStage'),
       {
         onPoint: (x, y, t, nearEdge) => this._handlePoint(x, y, t, nearEdge),
@@ -123,10 +172,11 @@ class NightMarketGame {
     );
 
     this._updateCollectionBadge();
+    this._startRenderLoop();
   }
 
   _emptyStats() {
-    return { dishes: 0, steps: 0, swipes: 0, holds: 0, stirs: 0, completedList: [] };
+    return { dishes: 0, steps: 0, swipes: 0, holds: 0, stirs: 0, coins: 0, completedList: [] };
   }
 
   _loadCollection() {
@@ -156,7 +206,7 @@ class NightMarketGame {
     toast.textContent = msg;
     toast.classList.remove('hidden');
     clearTimeout(this._toastTimer);
-    this._toastTimer = setTimeout(() => toast.classList.add('hidden'), 3200);
+    this._toastTimer = setTimeout(() => toast.classList.add('hidden'), 3000);
   }
 
   _initDOM() {
@@ -172,18 +222,56 @@ class NightMarketGame {
             document.getElementById('groupDishTarget').classList.toggle('hidden', this.settings.gameMode !== 'dishes');
             document.getElementById('groupTimeLimit').classList.toggle('hidden', this.settings.gameMode !== 'timed');
           }
+          if (key === 'trainingMode') {
+            document.getElementById('groupCogChoices').classList.toggle('hidden', this.settings.trainingMode !== 'cognitive');
+          }
         });
       });
     };
 
+    bindSeg('ctrlTrainingMode', 'trainingMode');
+    bindSeg('ctrlCogChoices', 'cogChoices', true);
     bindSeg('ctrlInputMode', 'inputMode');
     bindSeg('ctrlGameMode', 'gameMode');
+    bindSeg('ctrlCategoryFilter', 'categoryFilter');
     bindSeg('ctrlDishCount', 'targetDishes', true);
     bindSeg('ctrlTimeSec', 'timeLimitSec', true);
-    bindSeg('ctrlDirCount', 'dirCount', true);
     bindSeg('ctrlDirRule', 'dirRule');
     bindSeg('ctrlAngleTol', 'angleTol', true);
     bindSeg('ctrlStirMult', 'stirMult', true);
+
+    // 方向組合快速按鈕與 8 宮格個別勾選
+    const dirPresetEl = document.getElementById('ctrlDirPreset');
+    dirPresetEl?.querySelectorAll('button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        dirPresetEl.querySelectorAll('button').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const val = btn.dataset.val;
+        if (val === '4') this.settings.allowedDirs = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
+        else if (val === '8') this.settings.allowedDirs = ['UP', 'UR', 'RIGHT', 'DR', 'DOWN', 'DL', 'LEFT', 'UL'];
+        else if (val === 'high') this.settings.allowedDirs = ['UL', 'UP', 'UR'];
+        else if (val === 'wide') this.settings.allowedDirs = ['LEFT', 'RIGHT'];
+        this._syncDirChipsUI();
+      });
+    });
+
+    document.querySelectorAll('#customDirGrid .dir-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const d = chip.dataset.dir;
+        const set = new Set(this.settings.allowedDirs);
+        if (set.has(d)) {
+          if (set.size <= 1) {
+            this._showToast('請至少保留 1 個揮動方向');
+            return;
+          }
+          set.delete(d);
+        } else {
+          set.add(d);
+        }
+        this.settings.allowedDirs = Array.from(set);
+        this._syncDirChipsUI();
+      });
+    });
 
     document.querySelectorAll('.preset-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -199,12 +287,17 @@ class NightMarketGame {
       this.settings.distThreshold = Number(rng.value) / 100;
     });
 
-    document.getElementById('chkEnableHold').addEventListener('change', (e) => (this.settings.enableHold = e.target.checked));
+    document.getElementById('chkEnableSpoiled').addEventListener('change', (e) => (this.settings.enableSpoiled = e.target.checked));
+    document.getElementById('chkEnableDoubleCut').addEventListener('change', (e) => (this.settings.enableDoubleCut = e.target.checked));
     document.getElementById('chkEnableStir').addEventListener('change', (e) => (this.settings.enableStir = e.target.checked));
-    document.getElementById('chkMirror').addEventListener('change', (e) => (this.settings.mirrored = e.target.checked));
+    document.getElementById('chkMirror').addEventListener('change', (e) => {
+      this.settings.mirrored = e.target.checked;
+      document.getElementById('webcamVideo')?.classList.toggle('mirrored', this.settings.mirrored);
+    });
     document.getElementById('chkSound').addEventListener('change', (e) => {
       this.settings.sound = e.target.checked;
       this.sound.soundEnabled = e.target.checked;
+      this._syncSoundBtnUI();
     });
     document.getElementById('chkVoice').addEventListener('change', (e) => {
       this.settings.voice = e.target.checked;
@@ -216,16 +309,23 @@ class NightMarketGame {
       this.startGame();
     });
     document.getElementById('btnStartCustom').addEventListener('click', () => this.startGame());
-    document.getElementById('btnPauseGame').addEventListener('click', () => this.pauseGame());
-    document.getElementById('btnResume').addEventListener('click', () => this.resumeGame());
-    document.getElementById('btnRestart').addEventListener('click', () => {
-      document.getElementById('modalPause').classList.add('hidden');
-      this.startGame();
+
+    // HUD 音效與結束／打烊結算按鈕
+    document.getElementById('btnHudSound').addEventListener('click', () => {
+      this.settings.sound = !this.settings.sound;
+      this.sound.soundEnabled = this.settings.sound;
+      document.getElementById('chkSound').checked = this.settings.sound;
+      this._syncSoundBtnUI();
     });
-    document.getElementById('btnQuitToMenu').addEventListener('click', () => {
-      document.getElementById('modalPause').classList.add('hidden');
-      this.quitToMenu();
+
+    document.getElementById('btnHudFinish').addEventListener('click', () => {
+      if (this.stats.dishes > 0 || this.settings.gameMode === 'endless') {
+        this.finishGame();
+      } else {
+        this.quitToMenu();
+      }
     });
+
     document.getElementById('btnPlayAgain').addEventListener('click', () => this.startGame());
     document.getElementById('btnBackSettings').addEventListener('click', () => this.quitToMenu());
 
@@ -235,7 +335,6 @@ class NightMarketGame {
       this._syncPerfButtonUI();
     });
 
-    // 全螢幕切換
     document.getElementById('btnFullscreen')?.addEventListener('click', () => {
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen?.().catch(() => {});
@@ -244,7 +343,7 @@ class NightMarketGame {
       }
     });
 
-    // 30 道夜市美食收集圖鑑彈窗
+    // 50 道夜市美食收集圖鑑彈窗
     document.getElementById('btnOpenGallery').addEventListener('click', () => this._openGalleryModal('ALL'));
     document.getElementById('btnCloseGallery').addEventListener('click', () => {
       document.getElementById('modalGallery').classList.add('hidden');
@@ -258,39 +357,59 @@ class NightMarketGame {
     });
 
     this._initCalibrationModal();
+    window.addEventListener('resize', () => this._resizeCanvases());
+  }
 
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden && this.state === 'PLAYING') {
-        this.pauseGame();
-      }
+  _syncDirChipsUI() {
+    const set = new Set(this.settings.allowedDirs);
+    document.querySelectorAll('#customDirGrid .dir-chip').forEach((chip) => {
+      chip.classList.toggle('active', set.has(chip.dataset.dir));
     });
+  }
+
+  _syncSoundBtnUI() {
+    const btn = document.getElementById('btnHudSound');
+    if (btn) btn.textContent = this.settings.sound ? '🔊' : '🔇';
   }
 
   _syncPerfButtonUI() {
     const btn = document.getElementById('btnTogglePerf');
-    btn.textContent = this.settings.lowPerf ? '🔋 省電順暢' : '⚡ 一般效能';
-    document.body.classList.toggle('low-perf', this.settings.lowPerf);
+    if (btn) btn.textContent = this.settings.lowPerf ? '🔋 省電順暢' : '⚡ 一般效能';
   }
 
   _applyPreset(preset) {
     if (preset === 'easy') {
-      this.settings.dirCount = 4;
+      this.settings.trainingMode = 'action';
+      this.settings.allowedDirs = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
       this.settings.dirRule = 'normal';
-      this.settings.enableHold = false;
-      this.settings.enableStir = false;
+      this.settings.enableSpoiled = false;
+      this.settings.enableDoubleCut = false;
+      this.settings.enableStir = true;
       this.settings.distThreshold = 0.15;
     } else if (preset === 'brain') {
-      this.settings.dirCount = 4;
+      this.settings.trainingMode = 'action';
+      this.settings.allowedDirs = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
       this.settings.dirRule = 'mixed';
-      this.settings.enableHold = true;
-      this.settings.enableStir = false;
-      this.settings.distThreshold = 0.18;
-    } else if (preset === 'master') {
-      this.settings.dirCount = 8;
-      this.settings.dirRule = 'mixed';
-      this.settings.enableHold = true;
+      this.settings.enableSpoiled = true;
+      this.settings.enableDoubleCut = false;
       this.settings.enableStir = true;
-      this.settings.distThreshold = 0.20;
+      this.settings.distThreshold = 0.18;
+    } else if (preset === 'cognitive') {
+      this.settings.trainingMode = 'cognitive';
+      this.settings.cogChoices = 3;
+      this.settings.allowedDirs = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
+      this.settings.dirRule = 'normal';
+      this.settings.enableSpoiled = false;
+      this.settings.enableDoubleCut = false;
+      this.settings.distThreshold = 0.16;
+    } else if (preset === 'master') {
+      this.settings.trainingMode = 'action';
+      this.settings.allowedDirs = ['UP', 'UR', 'RIGHT', 'DR', 'DOWN', 'DL', 'LEFT', 'UL'];
+      this.settings.dirRule = 'mixed';
+      this.settings.enableSpoiled = true;
+      this.settings.enableDoubleCut = true;
+      this.settings.enableStir = true;
+      this.settings.distThreshold = 0.19;
     }
 
     const syncSeg = (id, val) => {
@@ -298,20 +417,33 @@ class NightMarketGame {
       if (!c) return;
       c.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.val === String(val)));
     };
-    syncSeg('ctrlDirCount', this.settings.dirCount);
+    syncSeg('ctrlTrainingMode', this.settings.trainingMode);
+    syncSeg('ctrlCogChoices', this.settings.cogChoices);
     syncSeg('ctrlDirRule', this.settings.dirRule);
+    syncSeg('ctrlDirPreset', this.settings.allowedDirs.length === 8 ? '8' : '4');
+    document.getElementById('groupCogChoices').classList.toggle('hidden', this.settings.trainingMode !== 'cognitive');
 
-    document.getElementById('chkEnableHold').checked = this.settings.enableHold;
+    document.getElementById('chkEnableSpoiled').checked = this.settings.enableSpoiled;
+    document.getElementById('chkEnableDoubleCut').checked = this.settings.enableDoubleCut;
     document.getElementById('chkEnableStir').checked = this.settings.enableStir;
+    this._syncDirChipsUI();
+
     const pct = Math.round(this.settings.distThreshold * 100);
     document.getElementById('rngDistThreshold').value = pct;
     document.getElementById('lblDistThreshold').textContent = `${pct}%`;
   }
 
+  _getFilteredPool() {
+    if (this.settings.categoryFilter === 'ALL') return RECIPES_DB;
+    const list = RECIPES_DB.filter((r) => r.category === this.settings.categoryFilter);
+    return list.length > 0 ? list : RECIPES_DB;
+  }
+
   _drawRecipeFromDeck() {
     if (this.recipeQueue.length === 0) {
-      this.recipeQueue = [...RECIPES_DB].sort(() => Math.random() - 0.5);
-      if (this.currentDish && this.recipeQueue[this.recipeQueue.length - 1].id === this.currentDish.id) {
+      const pool = this._getFilteredPool();
+      this.recipeQueue = [...pool].sort(() => Math.random() - 0.5);
+      if (this.currentDish && this.recipeQueue.length > 1 && this.recipeQueue[this.recipeQueue.length - 1].id === this.currentDish.id) {
         const last = this.recipeQueue.pop();
         this.recipeQueue.unshift(last);
       }
@@ -333,30 +465,42 @@ class NightMarketGame {
     this.recipeQueue = [];
     this.currentDish = null;
     this.nextDish = null;
-    this.consecutiveSpecials = 0;
 
     this.startTimeMs = performance.now();
-    this.pausedElapsedMs = 0;
     this.remainSec = this.settings.timeLimitSec;
 
     this._switchScreen('screenGame');
+    this._resizeCanvases();
+
     document.getElementById('completedThumbs').innerHTML = '';
     document.getElementById('hudCompletedCount').textContent = '0';
     document.getElementById('celebrateOverlay').classList.add('hidden');
 
-    const camBox = document.getElementById('camPreviewBox');
-    camBox.classList.toggle('hidden', this.settings.inputMode !== 'camera');
-    camBox.classList.toggle('mirrored', this.settings.mirrored);
+    const coinBadge = document.getElementById('hudCoinBadge');
+    coinBadge.classList.toggle('hidden', this.settings.gameMode !== 'endless');
+    coinBadge.textContent = '｜💰 0 銅板';
 
-    try {
-      await this.tracker.start(this.settings.inputMode, {
-        mirrored: this.settings.mirrored,
-        lowPerf: this.settings.lowPerf,
-      });
-    } catch {
-      this._showToast('無法開啟攝影機，已自動切換為「觸控／滑鼠模式」');
-      this.settings.inputMode = 'touch';
-      camBox.classList.add('hidden');
+    const finishBtn = document.getElementById('btnHudFinish');
+    finishBtn.textContent = this.settings.gameMode === 'endless' ? '🏆 打烊結算' : '🏠 結束';
+
+    const videoEl = document.getElementById('webcamVideo');
+    videoEl.classList.toggle('mirrored', this.settings.mirrored);
+
+    if (this.settings.inputMode === 'camera') {
+      try {
+        await this.tracker.start('camera', {
+          mirrored: this.settings.mirrored,
+          lowPerf: this.settings.lowPerf,
+        });
+        videoEl.style.display = 'block';
+      } catch {
+        this._showToast('無法開啟攝影機，已自動切換為「觸控／滑鼠模式」');
+        this.settings.inputMode = 'touch';
+        videoEl.style.display = 'none';
+        await this.tracker.start('touch');
+      }
+    } else {
+      videoEl.style.display = 'none';
       await this.tracker.start('touch');
     }
 
@@ -369,7 +513,7 @@ class NightMarketGame {
     clearInterval(this.timerInterval);
     this._updateTargetHUD();
     this.timerInterval = setInterval(() => {
-      if (this.state !== 'PLAYING') return;
+      if (this.state !== 'PLAYING' && this.state !== 'ANIMATING') return;
       if (this.settings.gameMode === 'timed') {
         this.remainSec--;
         this._updateTargetHUD();
@@ -380,15 +524,21 @@ class NightMarketGame {
     }, 1000);
   }
 
+  _getEndlessRankTitle(dishes) {
+    if (dishes >= 10) return '👑 夜市傳奇總舖師';
+    if (dishes >= 6) return '⭐⭐⭐ 排隊老店';
+    if (dishes >= 3) return '⭐⭐ 人氣名攤';
+    return '⭐ 夜市小推車';
+  }
+
   _updateTargetHUD() {
-    const lbl = document.getElementById('hudTargetLabel');
     const val = document.getElementById('hudTargetVal');
     if (this.settings.gameMode === 'dishes') {
-      lbl.textContent = '剩餘料理';
-      val.textContent = `${Math.max(0, this.settings.targetDishes - this.stats.dishes)} 道`;
+      val.textContent = `剩餘 ${Math.max(0, this.settings.targetDishes - this.stats.dishes)} 道`;
+    } else if (this.settings.gameMode === 'timed') {
+      val.textContent = `倒數 ${Math.max(0, this.remainSec)} 秒`;
     } else {
-      lbl.textContent = '剩餘時間';
-      val.textContent = `${Math.max(0, this.remainSec)} 秒`;
+      val.textContent = `${this._getEndlessRankTitle(this.stats.dishes)}`;
     }
   }
 
@@ -396,7 +546,6 @@ class NightMarketGame {
     this.currentDish = this.nextDish || this._drawRecipeFromDeck();
     this.nextDish = this._drawRecipeFromDeck();
 
-    // 先等待當前料理圖片就緒（通常數毫秒），並背景預載下一道料理
     await this.assets.preloadRecipes([this.currentDish]);
     this.assets.preloadRecipes([this.nextDish]);
     this.assets.pruneOldIngredients([this.currentDish, this.nextDish]);
@@ -409,174 +558,597 @@ class NightMarketGame {
         isFinish: false,
         id: ing.id,
         name: ing.name,
+        prepType: ing.prepType || 'cut',
         imgSrc: ing.img,
+        collected: false,
       })),
       {
         isFinish: true,
         id: this.currentDish.id,
-        name: '完成料理',
-        imgSrc: this.currentDish.finishImg,
+        name: this.currentDish.name,
+        prepType: 'stir',
+        imgSrc: this.settings.enableStir ? 'assets/common/wok.webp' : this.currentDish.finishImg,
       },
     ];
     this.stepIndex = 0;
 
-    document.getElementById('hudCategoryTag').textContent = this.currentDish.category;
-    document.getElementById('hudDishName').textContent = this.currentDish.name;
+    this._syncTopHudDishInfo();
     this._renderIngredientSlots();
     this._setupStepTask();
   }
 
+  _syncTopHudDishInfo() {
+    const isMystery = this.settings.trainingMode === 'cognitive' && this.stepIndex < 4;
+    const thumb = document.getElementById('hudDishThumb');
+    const nameEl = document.getElementById('hudDishName');
+    const catEl = document.getElementById('hudCategoryTag');
+
+    catEl.textContent = this.currentDish.category;
+    if (isMystery) {
+      thumb.src = 'assets/common/wok.webp';
+      nameEl.textContent = '❓ 神秘料理';
+    } else {
+      thumb.src = this.currentDish.finishImg;
+      nameEl.textContent = this.currentDish.name;
+    }
+
+    const dots = document.querySelectorAll('#hudStepDots .step-dot');
+    dots.forEach((d, idx) => {
+      d.classList.remove('active', 'done');
+      if (idx < this.stepIndex) d.classList.add('done');
+      else if (idx === this.stepIndex) d.classList.add('active');
+    });
+    document.getElementById('hudStepProgress').textContent = `步驟 ${this.stepIndex + 1} / 5`;
+  }
+
   _renderIngredientSlots() {
     const container = document.getElementById('ingredientSlots');
-    container.innerHTML = this.currentSteps
+    const ingSteps = this.currentSteps.slice(0, 4);
+    container.innerHTML = ingSteps
       .map(
         (step, idx) => `
-      <div class="ing-slot ${idx < this.stepIndex ? 'done' : idx === this.stepIndex ? 'current' : ''}">
-        <img class="slot-thumb" src="${step.imgSrc}" alt="${step.name}" loading="eager" />
-        <span class="slot-name">${idx === 4 ? '5.完成出餐' : `${idx + 1}.${step.name}`}</span>
+      <div class="slot-item ${step.collected ? 'collected' : idx === this.stepIndex ? 'active' : ''}" data-slot-index="${idx}">
+        <img src="${step.imgSrc}" alt="${step.name}" loading="eager" />
+        <span>${step.name}</span>
       </div>
     `
       )
       .join('');
   }
 
+  _pickRandomDirection(excludeKey = null) {
+    const pool = this.settings.allowedDirs.filter((k) => k !== excludeKey);
+    const list = pool.length > 0 ? pool : this.settings.allowedDirs;
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
+  _pickIsReverse() {
+    if (this.settings.dirRule === 'reverse') return true;
+    if (this.settings.dirRule === 'mixed') return Math.random() < 0.5;
+    return false;
+  }
+
   _setupStepTask() {
     const step = this.currentSteps[this.stepIndex];
-    document.getElementById('hudStepProgress').textContent = `${this.stepIndex + 1} / 5`;
+    this._syncTopHudDishInfo();
     this._renderIngredientSlots();
     this.judge.resetState();
 
-    // 更新目前步驟的食材／成品視覺卡片
+    const foodHeroWrap = document.getElementById('foodHeroWrap');
+    const foodImgBox = document.getElementById('foodImgBox');
     const stepImgEl = document.getElementById('currentStepImg');
+    const halfLeft = document.getElementById('foodHalfLeft');
+    const halfRight = document.getElementById('foodHalfRight');
     const stepLabelEl = document.getElementById('currentStepLabel');
-    stepImgEl.src = step.imgSrc;
-    stepImgEl.alt = step.name;
-    stepLabelEl.textContent = step.isFinish ? `第 5 步：完成【${this.currentDish.name}】` : `收集食材：${step.name}`;
+    const hintSubEl = document.getElementById('promptTargetText');
+    const ruleBanner = document.getElementById('ruleBanner');
+    const arrowOverlay = document.getElementById('arrowOverlay');
+    const spoiledOverlay = document.getElementById('spoiledOverlay');
+    const spoiledRingSvg = document.getElementById('spoiledRingSvg');
+    const spoiledTimerText = document.getElementById('spoiledTimerText');
+    const doubleCutBadge = document.getElementById('doubleCutBadge');
+    const stirMeterWrap = document.getElementById('stirMeterWrap');
+    const cogChoiceArena = document.getElementById('cogChoiceArena');
 
-    // 決定本題類型（一般方向 / 等待 3 秒 / 自由翻炒）
-    let taskType = 'DIRECTION';
-    const specialPool = [];
-    if (this.settings.enableHold) specialPool.push('HOLD');
-    if (this.settings.enableStir) specialPool.push('STIR');
+    foodHeroWrap.className = 'food-hero-wrap';
+    foodImgBox.classList.remove('stirring');
+    spoiledOverlay.classList.add('hidden');
+    spoiledRingSvg.classList.remove('active');
+    spoiledTimerText.classList.remove('active');
+    doubleCutBadge.classList.add('hidden');
+    stirMeterWrap.classList.remove('active');
+    cogChoiceArena.classList.add('hidden');
+    arrowOverlay.style.display = 'none';
 
-    if (specialPool.length > 0 && this.consecutiveSpecials < 2 && Math.random() < this.settings.specialProb) {
-      taskType = specialPool[Math.floor(Math.random() * specialPool.length)];
-      this.consecutiveSpecials++;
-    } else {
-      this.consecutiveSpecials = 0;
+    // 情境 A：第 5 步且為「認知推理選菜模式」
+    if (step.isFinish && this.settings.trainingMode === 'cognitive') {
+      foodHeroWrap.classList.add('hidden');
+      stepLabelEl.classList.add('hidden');
+      cogChoiceArena.classList.remove('hidden');
+
+      ruleBanner.className = 'rule-banner reverse';
+      ruleBanner.textContent = '🧠 猜猜看！這 4 樣材料是哪道夜市美食？';
+      hintSubEl.textContent = '將手部發光游標移到正確料理卡片上停留 0.8 秒（或直接點選）';
+      this.sound.speak('看看底下的四樣材料，猜猜看是哪一道料理？');
+      this._setupCognitiveChoices();
+      return;
     }
 
-    document.getElementById('viewDirection').classList.toggle('active', taskType === 'DIRECTION');
-    document.getElementById('viewHold').classList.toggle('active', taskType === 'HOLD');
-    document.getElementById('viewStir').classList.toggle('active', taskType === 'STIR');
+    foodHeroWrap.classList.remove('hidden');
+    stepLabelEl.classList.remove('hidden');
 
-    const banner = document.getElementById('promptBanner');
-    const ruleTag = document.getElementById('promptRuleTag');
-    const targetText = document.getElementById('promptTargetText');
-    targetText.textContent = step.isFinish ? this.currentDish.finishText : `加入「${step.name}」`;
+    stepImgEl.src = step.imgSrc;
+    halfLeft.src = step.imgSrc;
+    halfRight.src = step.imgSrc;
 
-    if (taskType === 'DIRECTION') {
-      const dirKeys =
-        this.settings.dirCount === 4
-          ? ['UP', 'DOWN', 'LEFT', 'RIGHT']
-          : ['UP', 'UR', 'RIGHT', 'DR', 'DOWN', 'DL', 'LEFT', 'UL'];
-      const shownKey = dirKeys[Math.floor(Math.random() * dirKeys.length)];
+    // 情境 B：第 5 步且為「動作料理模式」
+    if (step.isFinish) {
+      if (this.settings.enableStir) {
+        this.currentTask = { type: 'STIR' };
+        ruleBanner.className = 'rule-banner stir';
+        ruleBanner.textContent = `🔥 第 5 步：大火翻炒【${this.currentDish.name}】`;
+        stirMeterWrap.classList.add('active');
+        document.getElementById('stirProgressFill').style.width = '0%';
+        document.getElementById('stirPercentText').textContent = '翻炒熱度 0%';
+        stepLabelEl.textContent = `🍳 翻炒出餐：${this.currentDish.name}`;
+        hintSubEl.textContent = '任意方向來回揮動翻炒，鍋子會跟著震動出餐！';
+        this.sound.speak(`自由翻炒，完成${this.currentDish.name}`);
+        return;
+      }
+      // 若關閉翻炒則第 5 步使用方向揮動盛盤
+      stepImgEl.src = this.currentDish.finishImg;
+      halfLeft.src = this.currentDish.finishImg;
+      halfRight.src = this.currentDish.finishImg;
+    }
 
-      let isReverse = false;
-      if (this.settings.dirRule === 'reverse') isReverse = true;
-      else if (this.settings.dirRule === 'mixed') isReverse = Math.random() < 0.5;
+    // 情境 C：步驟 1-4 隨機插入「壞食材抑制 (Go/No-Go)」（若開啟且本步尚未觸發過）
+    if (!step.isFinish && this.settings.enableSpoiled && !step.spoiledCleared && Math.random() < 0.28) {
+      this.currentTask = { type: 'SPOILED' };
+      foodHeroWrap.classList.add('is-spoiled');
+      spoiledOverlay.classList.remove('hidden');
+      spoiledRingSvg.classList.add('active');
+      spoiledTimerText.classList.add('active');
+      document.getElementById('spoiledRingProg').style.strokeDashoffset = '339.29';
+      spoiledTimerText.textContent = '✋ 忍住不動 2.5s';
 
-      const requiredDirKey = isReverse ? DIR_VECTORS[shownKey].opposite : shownKey;
-      this.currentTask = { type: 'DIRECTION', shownKey, requiredDirKey, isReverse };
+      ruleBanner.className = 'rule-banner spoiled';
+      ruleBanner.textContent = '🦠 壞食材警報！忍住不要揮動！';
+      stepLabelEl.textContent = `🤢 發霉的${step.name}`;
+      hintSubEl.textContent = '保持手部穩定不揮動 2.5 秒，自動掃進垃圾桶換新鮮食材';
+      this.sound.speak('壞掉了，忍住不要動');
+      return;
+    }
 
-      const arrowCircle = document.getElementById('arrowContainer');
-      arrowCircle.classList.toggle('rule-reverse', isReverse);
-      document.getElementById('arrowGlyph').textContent = DIR_VECTORS[shownKey].glyph;
-      document.getElementById('dirSwipeFill').style.width = '0%';
+    // 情境 D：一般方向揮動（含四大烹飪手感 & 兩刀連擊）
+    const shownKey = this._pickRandomDirection();
+    const isReverse = this._pickIsReverse();
+    const requiredDirKey = isReverse ? DIR_VECTORS[shownKey].opposite : shownKey;
 
-      banner.className = `prompt-banner ${isReverse ? 'rule-reverse' : 'rule-normal'}`;
-      ruleTag.textContent = isReverse ? '🔄 反方向揮動' : '➡️ 照箭頭揮動';
-    } else if (taskType === 'HOLD') {
-      this.currentTask = { type: 'HOLD' };
-      banner.className = 'prompt-banner rule-special';
-      ruleTag.textContent = '✋ 等一下！穩定維持 3 秒';
-      document.getElementById('holdRemainSec').textContent = '3.0';
-      document.getElementById('holdProgressFill').style.width = '0%';
-      this.sound.speak('等一下，手部維持穩定');
-    } else if (taskType === 'STIR') {
-      this.currentTask = { type: 'STIR' };
-      banner.className = 'prompt-banner rule-special';
-      ruleTag.textContent = '🍳 自由翻炒（任意方向移動）';
-      document.getElementById('stirPercentText').textContent = '0%';
-      document.getElementById('stirProgressFill').style.width = '0%';
-      this.sound.speak('自由翻炒');
+    const totalCuts = (!step.isFinish && this.settings.enableDoubleCut && Math.random() < 0.45) ? 2 : 1;
+    const prepInfo = PREP_LABELS[step.prepType] || PREP_LABELS.cut;
+
+    this.currentTask = {
+      type: 'DIRECTION',
+      shownKey,
+      requiredDirKey,
+      isReverse,
+      prepType: step.isFinish ? 'flip' : (step.prepType || 'cut'),
+      totalCuts,
+      currentCut: 1,
+    };
+
+    this._renderDirectionUI(step, prepInfo);
+  }
+
+  _renderDirectionUI(step, prepInfo) {
+    const { shownKey, isReverse, totalCuts, currentCut } = this.currentTask;
+    const arrowOverlay = document.getElementById('arrowOverlay');
+    const arrowSvg = document.getElementById('arrowSvg');
+    const arrowPath = document.getElementById('arrowPath');
+    const foodHalo = document.getElementById('foodHalo');
+    const ruleBanner = document.getElementById('ruleBanner');
+    const doubleCutBadge = document.getElementById('doubleCutBadge');
+    const stepLabelEl = document.getElementById('currentStepLabel');
+    const hintSubEl = document.getElementById('promptTargetText');
+
+    arrowOverlay.style.display = 'grid';
+    arrowOverlay.style.transform = `rotate(${DIR_VECTORS[shownKey].deg}deg)`;
+    arrowSvg.classList.toggle('normal', !isReverse);
+    arrowSvg.classList.toggle('reverse', isReverse);
+    arrowPath.setAttribute('fill', isReverse ? 'url(#gradCyan)' : 'url(#gradGold)');
+    foodHalo.classList.toggle('reverse', isReverse);
+
+    if (totalCuts > 1) {
+      doubleCutBadge.classList.remove('hidden');
+      doubleCutBadge.textContent = `⚔️ 第 ${currentCut} / ${totalCuts} 刀`;
+    } else {
+      doubleCutBadge.classList.add('hidden');
+    }
+
+    ruleBanner.className = `rule-banner ${isReverse ? 'reverse' : 'normal'}`;
+    if (isReverse) {
+      ruleBanner.textContent = `🧠 反方向挑戰！往箭頭「相反方向」揮 (${prepInfo.icon}${prepInfo.tag})`;
+      hintSubEl.textContent = '看見青藍色箭頭，請往相反方向揮動！';
+    } else {
+      ruleBanner.textContent = `🏮 照箭頭方向揮動 (${prepInfo.icon}${prepInfo.tag})`;
+      hintSubEl.textContent = `往暖金黃箭頭方向揮動，執行「${prepInfo.tag}」！`;
+    }
+
+    stepLabelEl.textContent = step.isFinish ? `🍽️ 盛盤出餐：${this.currentDish.name}` : `${prepInfo.icon} ${step.name}`;
+  }
+
+  _setupCognitiveChoices() {
+    const count = this.settings.cogChoices || 2;
+    const pool = RECIPES_DB.filter((r) => r.id !== this.currentDish.id).sort(() => Math.random() - 0.5);
+    const distractors = pool.slice(0, count - 1);
+    const options = [this.currentDish, ...distractors].sort(() => Math.random() - 0.5);
+
+    const positions = count === 2
+      ? ['LEFT', 'RIGHT']
+      : count === 3
+      ? ['LEFT', 'UP', 'RIGHT']
+      : ['UP', 'LEFT', 'RIGHT', 'DOWN'];
+
+    const posLabels = { LEFT: '👈 左側區', RIGHT: '👉 右側區', UP: '👆 上方區', DOWN: '👇 下方區' };
+
+    this.currentTask = {
+      type: 'COGNITIVE_CHOICE',
+      options: options.map((dish, idx) => ({
+        dish,
+        pos: positions[idx],
+        isCorrect: dish.id === this.currentDish.id,
+      })),
+    };
+    this.cogHoveredId = null;
+    this.cogHoverElapsedMs = 0;
+    this.cogLastTickMs = performance.now();
+
+    const arena = document.getElementById('cogChoiceArena');
+    arena.innerHTML = this.currentTask.options
+      .map(
+        (opt) => `
+      <div class="cog-card pos-${opt.pos}" data-dish-id="${opt.dish.id}">
+        <span class="cog-card-dir">${posLabels[opt.pos]}</span>
+        <div class="cog-card-img-wrap">
+          <img src="${opt.dish.finishImg}" alt="${opt.dish.name}" />
+          <svg class="cog-ring-svg" viewBox="0 0 120 120">
+            <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="6" />
+            <circle class="cog-ring-prog" data-ring-id="${opt.dish.id}" cx="60" cy="60" r="54" fill="none"
+              stroke="#4ade80" stroke-width="7" stroke-linecap="round"
+              stroke-dasharray="339.29" stroke-dashoffset="339.29" />
+          </svg>
+        </div>
+        <strong class="cog-card-title">${opt.dish.name}</strong>
+      </div>
+    `
+      )
+      .join('');
+
+    arena.querySelectorAll('.cog-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        if (this.state !== 'PLAYING' || this.currentTask?.type !== 'COGNITIVE_CHOICE') return;
+        this._evaluateCogSelection(card.dataset.dishId);
+      });
+    });
+  }
+
+  _evaluateCogSelection(selectedDishId) {
+    if (this.state !== 'PLAYING') return;
+    const cardEl = document.querySelector(`.cog-card[data-dish-id="${selectedDishId}"]`);
+    if (selectedDishId === this.currentDish.id) {
+      this.stats.steps++;
+      this.stats.stirs++;
+      this._triggerDishComplete();
+    } else {
+      this.sound.playWrongBuzz();
+      this.sound.speak('再看看下面的四樣材料喔');
+      cardEl?.classList.add('wrong-shake');
+      setTimeout(() => cardEl?.classList.remove('wrong-shake'), 450);
+      this.cogHoveredId = null;
+      this.cogHoverElapsedMs = 0;
     }
   }
 
-  _handlePoint(x, y, nowMs, nearEdge) {
+  _handlePoint(x, y, nowMs) {
+    // 記錄手部游標與光軌座標
+    const canvas = document.getElementById('fxCanvas');
+    if (canvas) {
+      const px = x * canvas.width;
+      const py = y * canvas.height;
+      this.cursorPos = { x: px, y: py };
+      this.trail.push({ x: px, y: py, life: 1.0 });
+    }
+
     if (this.state === 'CALIBRATING') {
       this._updateCalibration(x, y);
       return;
     }
     if (this.state !== 'PLAYING' || !this.currentTask) return;
 
-    const camBox = document.getElementById('camPreviewBox');
-    const camTxt = document.getElementById('camStatusText');
-    camBox.classList.toggle('status-ok', !nearEdge);
-    camBox.classList.toggle('status-lost', nearEdge);
-    camTxt.textContent = nearEdge ? '⚠️ 手部太靠邊緣' : '✅ 追蹤穩定';
+    // 認知推理模式第 5 步：手部游標懸停感應選料理
+    if (this.currentTask.type === 'COGNITIVE_CHOICE') {
+      this._updateCognitiveHover(x, y, nowMs);
+      return;
+    }
 
     const res = this.judge.updatePoint(x, y, nowMs, this.currentTask);
 
     if (this.currentTask.type === 'DIRECTION') {
-      document.getElementById('dirSwipeFill').style.width = `${Math.round(res.progress * 100)}%`;
       if (res.status === 'completed') {
-        this._drawSlashFX(res.startAnchor, { x, y }, this.currentTask.isReverse);
         this.stats.swipes++;
-        this._completeCurrentStep();
+        // 若為兩刀連擊的第一刀
+        if (this.currentTask.currentCut < this.currentTask.totalCuts) {
+          this._playFirstCutFX(res.swipeAngleRad, this.currentTask.isReverse);
+          this.currentTask.currentCut++;
+          const nextShown = this._pickRandomDirection(this.currentTask.shownKey);
+          const nextRev = this.settings.dirRule === 'normal' ? false : !this.currentTask.isReverse;
+          this.currentTask.shownKey = nextShown;
+          this.currentTask.isReverse = nextRev;
+          this.currentTask.requiredDirKey = nextRev ? DIR_VECTORS[nextShown].opposite : nextShown;
+          const step = this.currentSteps[this.stepIndex];
+          this._renderDirectionUI(step, PREP_LABELS[step.prepType] || PREP_LABELS.cut);
+        } else {
+          this._triggerPrepCompleteAnimation(res.swipeAngleRad, this.currentTask.isReverse, this.currentTask.prepType);
+        }
       }
-    } else if (this.currentTask.type === 'HOLD') {
-      document.getElementById('holdProgressFill').style.width = `${Math.round(res.progress * 100)}%`;
+    } else if (this.currentTask.type === 'SPOILED') {
+      if (res.status === 'spoiled_cut') {
+        this.sound.playWrongBuzz();
+        this.sound.speak('切到壞食材了，換一顆新鮮的');
+        this._showToast('🤢 不小心揮到壞食材了！已為您換上新鮮食材');
+        this.currentSteps[this.stepIndex].spoiledCleared = true;
+        this._setupStepTask();
+        return;
+      }
       if (res.remainSec !== undefined) {
-        document.getElementById('holdRemainSec').textContent = res.remainSec.toFixed(1);
+        const offset = 339.29 * (1 - res.progress);
+        document.getElementById('spoiledRingProg').style.strokeDashoffset = offset.toFixed(1);
+        document.getElementById('spoiledTimerText').textContent = `✋ 忍住不動 ${res.remainSec.toFixed(1)}s`;
       }
       if (res.status === 'completed') {
         this.stats.holds++;
-        this._completeCurrentStep();
+        this._triggerSpoiledSweepAnimation();
       }
     } else if (this.currentTask.type === 'STIR') {
       const pct = Math.round(res.progress * 100);
-      document.getElementById('stirPercentText').textContent = `${pct}%`;
+      document.getElementById('stirPercentText').textContent = `翻炒熱度 ${pct}%`;
       document.getElementById('stirProgressFill').style.width = `${pct}%`;
-      document.getElementById('stirWokBox').classList.toggle('stirring', !!res.isMoving);
-      if (res.status === 'completed') {
-        document.getElementById('stirWokBox').classList.remove('stirring');
-        this.stats.stirs++;
-        this._completeCurrentStep();
+
+      // 僅在主動翻炒移動時才觸發鍋具震動與手機微震動
+      const foodImgBox = document.getElementById('foodImgBox');
+      foodImgBox.classList.toggle('stirring', !!res.isMoving);
+      if (res.isMoving && nowMs - this.lastVibrateAt > 130) {
+        this.lastVibrateAt = nowMs;
+        if (navigator.vibrate) navigator.vibrate(14);
       }
+
+      if (res.status === 'completed') {
+        foodImgBox.classList.remove('stirring');
+        this.stats.stirs++;
+        this._triggerStirFinishAnimation();
+      }
+    }
+  }
+
+  _updateCognitiveHover(normX, normY, nowMs) {
+    const dt = this.cogLastTickMs ? Math.min(120, nowMs - this.cogLastTickMs) : 16;
+    this.cogLastTickMs = nowMs;
+
+    const stageRect = document.getElementById('playStage').getBoundingClientRect();
+    const clientX = stageRect.left + normX * stageRect.width;
+    const clientY = stageRect.top + normY * stageRect.height;
+
+    let hitId = null;
+    document.querySelectorAll('#cogChoiceArena .cog-card').forEach((card) => {
+      const r = card.getBoundingClientRect();
+      if (clientX >= r.left - 12 && clientX <= r.right + 12 && clientY >= r.top - 12 && clientY <= r.bottom + 12) {
+        hitId = card.dataset.dishId;
+      }
+      card.classList.toggle('hovering', card.dataset.dishId === hitId);
+    });
+
+    if (hitId && hitId === this.cogHoveredId) {
+      this.cogHoverElapsedMs += dt;
+    } else {
+      this.cogHoveredId = hitId;
+      this.cogHoverElapsedMs = hitId ? dt : 0;
+    }
+
+    document.querySelectorAll('#cogChoiceArena .cog-ring-prog').forEach((circle) => {
+      const id = circle.dataset.ringId;
+      const prog = id === this.cogHoveredId ? Math.min(1, this.cogHoverElapsedMs / 850) : 0;
+      circle.style.strokeDashoffset = (339.29 * (1 - prog)).toFixed(1);
+    });
+
+    if (this.cogHoveredId && this.cogHoverElapsedMs >= 850) {
+      const chosen = this.cogHoveredId;
+      this.cogHoveredId = null;
+      this.cogHoverElapsedMs = 0;
+      this._evaluateCogSelection(chosen);
     }
   }
 
   _handleLost() {
     this.judge.onTrackingLost();
-    const camBox = document.getElementById('camPreviewBox');
-    camBox.classList.remove('status-ok');
-    camBox.classList.add('status-lost');
-    document.getElementById('camStatusText').textContent = '請將手舉到畫面中';
-    document.getElementById('stirWokBox')?.classList.remove('stirring');
+    document.getElementById('foodImgBox')?.classList.remove('stirring');
   }
 
-  _completeCurrentStep() {
-    if (this.state !== 'PLAYING') return;
-    this.stats.steps++;
-    this.sound.playSliceSuccess();
+  _playFirstCutFX(angleRad = -0.7, isReverse = false) {
+    const wrap = document.getElementById('foodHeroWrap');
+    const rect = wrap.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
 
-    this.stepIndex++;
-    if (this.stepIndex < 5) {
-      this._setupStepTask();
-    } else {
-      this._triggerDishComplete();
+    this.sound.playPrepSound('cut', isReverse);
+    this.slashes.push({
+      cx, cy,
+      angle: angleRad ?? -0.7,
+      len: Math.max(rect.width * 1.35, 260),
+      life: 1.0,
+      color: isReverse ? '#38bdf8' : '#f59e0b',
+      core: '#ffffff',
+    });
+    this.callouts.push({ x: cx, y: cy - rect.height * 0.42, text: '⚔️ 第一刀命中！再揮第二刀！', color: '#fde68a', life: 0.95 });
+  }
+
+  // 四大烹飪手感動畫（切菜切半 / 撒粉淋醬 / 倒料下鍋 / 翻面夾取）
+  _triggerPrepCompleteAnimation(angleRad = -0.78, isReverse = false, prepType = 'cut') {
+    if (this.state !== 'PLAYING') return;
+    this.state = 'ANIMATING';
+
+    const wrap = document.getElementById('foodHeroWrap');
+    const rect = wrap.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const prepMeta = PREP_LABELS[prepType] || PREP_LABELS.cut;
+
+    this.sound.playPrepSound(prepType, isReverse);
+
+    // 1. 若為切菜刀法才畫銳利斬擊光刃，其他則畫溫潤弧光
+    if (prepType === 'cut') {
+      this.slashes.push({
+        cx, cy,
+        angle: angleRad ?? -0.78,
+        len: Math.max(rect.width * 1.45, 300),
+        life: 1.0,
+        color: isReverse ? '#38bdf8' : '#f59e0b',
+        core: '#ffffff',
+      });
     }
+
+    this.rings.push({
+      x: cx, y: cy, r: 24, maxR: rect.width * 0.92,
+      life: 1.0,
+      color: isReverse ? '#38bdf8' : '#fbbf24',
+    });
+    this.callouts.push({
+      x: cx, y: cy - rect.height * 0.45,
+      text: prepMeta.callout,
+      color: isReverse ? '#e0f2fe' : '#fde68a',
+      life: 1.0,
+    });
+
+    // 2. 依烹飪分類產生專屬粒子
+    for (let i = 0; i < 30; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const spd = 2.5 + Math.random() * 9.5;
+      this.sparks.push({
+        x: cx + (Math.random() - 0.5) * 36,
+        y: cy + (Math.random() - 0.5) * 36,
+        vx: prepType === 'sprinkle' ? (Math.random() - 0.5) * 5 : Math.cos(a) * spd,
+        vy: prepType === 'sprinkle' ? 2 + Math.random() * 6 : Math.sin(a) * spd - 2,
+        size: 2.5 + Math.random() * 4.5,
+        life: 1.0,
+        decay: 0.022 + Math.random() * 0.02,
+        color: prepType === 'pour'
+          ? (i % 2 === 0 ? '#7dd3fc' : '#fffbeb')
+          : (isReverse ? '#38bdf8' : (i % 2 === 0 ? '#fbbf24' : '#f97316')),
+      });
+    }
+
+    wrap.classList.add(prepMeta.anim);
+
+    // 3. 飛入底部對應收集格
+    const step = this.currentSteps[this.stepIndex];
+    const slotEl = document.querySelector(`#ingredientSlots [data-slot-index="${this.stepIndex}"]`);
+    if (slotEl && !step.isFinish) {
+      const sRect = slotEl.getBoundingClientRect();
+      const fly = document.createElement('img');
+      fly.src = step.imgSrc;
+      fly.className = 'fly-token';
+      fly.style.left = `${cx}px`;
+      fly.style.top = `${cy}px`;
+      document.body.appendChild(fly);
+      requestAnimationFrame(() => {
+        fly.style.left = `${sRect.left + sRect.width / 2}px`;
+        fly.style.top = `${sRect.top + sRect.height / 2}px`;
+        fly.style.transform = 'translate(-50%, -50%) scale(0.42)';
+        fly.style.opacity = '0.2';
+      });
+      setTimeout(() => fly.remove(), 480);
+    }
+
+    setTimeout(() => {
+      wrap.classList.remove(prepMeta.anim);
+      step.collected = true;
+      this.stats.steps++;
+      this.stepIndex++;
+      this.state = 'PLAYING';
+      if (this.stepIndex < 5) {
+        this._setupStepTask();
+      } else {
+        this._triggerDishComplete();
+      }
+    }, 500);
+  }
+
+  _triggerSpoiledSweepAnimation() {
+    if (this.state !== 'PLAYING') return;
+    this.state = 'ANIMATING';
+    this.sound.playSpoiledSweep();
+
+    const wrap = document.getElementById('foodHeroWrap');
+    const rect = wrap.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+
+    this.callouts.push({
+      x: cx, y: cy - rect.height * 0.42,
+      text: '🧹 成功忍住！掃進垃圾桶！',
+      color: '#86efac',
+      life: 1.05,
+    });
+    wrap.classList.add('anim-sweep');
+
+    setTimeout(() => {
+      wrap.classList.remove('anim-sweep', 'is-spoiled');
+      this.currentSteps[this.stepIndex].spoiledCleared = true;
+      this.state = 'PLAYING';
+      this._setupStepTask();
+    }, 480);
+  }
+
+  _triggerStirFinishAnimation() {
+    if (this.state !== 'PLAYING') return;
+    this.state = 'ANIMATING';
+
+    const wrap = document.getElementById('foodHeroWrap');
+    const rect = wrap.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+
+    this.rings.push({ x: cx, y: cy, r: 28, maxR: rect.width * 1.05, life: 1.0, color: '#f97316' });
+    this.callouts.push({ x: cx, y: cy - rect.height * 0.46, text: '🔥 大火爆香出餐！', color: '#fde68a', life: 1.1 });
+
+    for (let i = 0; i < 26; i++) {
+      this.sparks.push({
+        x: cx + (Math.random() - 0.5) * rect.width * 0.7,
+        y: cy + rect.height * 0.2,
+        vx: (Math.random() - 0.5) * 5,
+        vy: -5 - Math.random() * 8,
+        size: 3 + Math.random() * 5,
+        life: 1.0,
+        decay: 0.022,
+        color: i % 2 === 0 ? '#fbbf24' : '#ef4444',
+      });
+    }
+    for (let i = 0; i < 12; i++) {
+      this.steams.push({
+        x: cx + (Math.random() - 0.5) * rect.width * 0.55,
+        y: cy + (Math.random() - 0.5) * 36,
+        vx: (Math.random() - 0.5) * 1.6,
+        vy: -2.4 - Math.random() * 2.4,
+        r: 14 + Math.random() * 20,
+        life: 1.0,
+      });
+    }
+
+    wrap.classList.add('anim-stir-done');
+    setTimeout(() => {
+      wrap.classList.remove('anim-stir-done');
+      this.stats.steps++;
+      this._triggerDishComplete();
+    }, 560);
   }
 
   _triggerDishComplete() {
@@ -585,26 +1157,33 @@ class NightMarketGame {
     this.sound.speak(`出餐成功！${this.currentDish.name}`);
 
     this.stats.dishes++;
+    this.stats.coins += 100;
     this.stats.completedList.push(this.currentDish);
     this._updateTargetHUD();
 
-    // 寫入 30 道夜市美食收集圖鑑
+    // 寫入 50 道夜市美食收集圖鑑
     this.unlockedSet.add(this.currentDish.id);
     this._saveCollection();
 
-    // 加入底部已出餐縮圖列
     document.getElementById('hudCompletedCount').textContent = String(this.stats.dishes);
+    const coinBadge = document.getElementById('hudCoinBadge');
+    if (this.settings.gameMode === 'endless') {
+      coinBadge.textContent = `｜💰 ${this.stats.coins} 銅板`;
+    }
+
     const pill = document.createElement('div');
     pill.className = 'thumb-pill';
     pill.innerHTML = `<img src="${this.currentDish.finishImg}" alt="${this.currentDish.name}" /><span>${this.currentDish.name}</span>`;
     document.getElementById('completedThumbs').appendChild(pill);
 
-    // 顯示 1.2 秒簡單慶祝動畫
     const overlay = document.getElementById('celebrateOverlay');
     const celImg = document.getElementById('celebrateDishImg');
     celImg.src = this.currentDish.finishImg;
     celImg.alt = this.currentDish.name;
     document.getElementById('celebrateDishTitle').textContent = this.currentDish.name;
+    document.getElementById('celebrateDishDesc').textContent = this.currentDish.finishText || '';
+    document.getElementById('celebrateBurstText').textContent =
+      this.settings.gameMode === 'endless' ? `🎉 出餐成功！+100 銅板 🎉` : '🎉 香氣出餐！ 🎉';
     overlay.classList.remove('hidden');
 
     this.celebrateTimer = setTimeout(async () => {
@@ -617,38 +1196,7 @@ class NightMarketGame {
         this.state = 'PLAYING';
         await this._startNextDish();
       }
-    }, 1200);
-  }
-
-  _drawSlashFX(p1, p2, isReverse) {
-    if (this.settings.lowPerf) return;
-    const canvas = document.getElementById('fxCanvas');
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
-    const ctx = canvas.getContext('2d');
-    ctx.strokeStyle = isReverse ? '#00e5ff' : '#ffb703';
-    ctx.lineWidth = 10;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(p1.x * canvas.width, p1.y * canvas.height);
-    ctx.lineTo(p2.x * canvas.width, p2.y * canvas.height);
-    ctx.stroke();
-    setTimeout(() => ctx.clearRect(0, 0, canvas.width, canvas.height), 250);
-  }
-
-  pauseGame() {
-    if (this.state !== 'PLAYING') return;
-    this.state = 'PAUSED';
-    this.pauseStartedAt = performance.now();
-    document.getElementById('modalPause').classList.remove('hidden');
-  }
-
-  resumeGame() {
-    if (this.state !== 'PAUSED') return;
-    this.pausedElapsedMs += performance.now() - this.pauseStartedAt;
-    document.getElementById('modalPause').classList.add('hidden');
-    this.judge.resetState();
-    this.state = 'PLAYING';
+    }, 1150);
   }
 
   quitToMenu() {
@@ -665,7 +1213,7 @@ class NightMarketGame {
     clearInterval(this.timerInterval);
     this.tracker.stop();
 
-    const activeMs = Math.max(0, performance.now() - this.startTimeMs - this.pausedElapsedMs);
+    const activeMs = Math.max(0, performance.now() - this.startTimeMs);
     const totalSec = Math.round(activeMs / 1000);
 
     document.getElementById('resDishes').textContent = `${this.stats.dishes} 道`;
@@ -674,6 +1222,14 @@ class NightMarketGame {
     document.getElementById('resHolds').textContent = `${this.stats.holds} 次`;
     document.getElementById('resStirs').textContent = `${this.stats.stirs} 次`;
     document.getElementById('resTime').textContent = `${totalSec} 秒`;
+
+    const rankBanner = document.getElementById('resStallRankBanner');
+    if (this.settings.gameMode === 'endless') {
+      rankBanner.classList.remove('hidden');
+      rankBanner.textContent = `🏮 無盡營業結算：獲得稱號【${this._getEndlessRankTitle(this.stats.dishes)}】｜累積營業額 ${this.stats.coins} 銅板`;
+    } else {
+      rankBanner.classList.add('hidden');
+    }
 
     const incBox = document.getElementById('resIncompleteBox');
     if (this.stepIndex > 0 && this.stepIndex < 5 && this.currentDish) {
@@ -732,6 +1288,231 @@ class NightMarketGame {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  _resizeCanvases() {
+    const stage = document.getElementById('playStage');
+    const bgCanvas = document.getElementById('bgSimCanvas');
+    const fxCanvas = document.getElementById('fxCanvas');
+    if (!stage || !bgCanvas || !fxCanvas) return;
+    const w = Math.max(320, stage.clientWidth || window.innerWidth);
+    const h = Math.max(240, stage.clientHeight || window.innerHeight);
+    bgCanvas.width = Math.floor(w * 0.5);
+    bgCanvas.height = Math.floor(h * 0.5);
+    fxCanvas.width = w;
+    fxCanvas.height = h;
+  }
+
+  _startRenderLoop() {
+    let lastTs = performance.now();
+    const tick = (ts) => {
+      const dt = Math.min(0.05, (ts - lastTs) / 1000);
+      lastTs = ts;
+
+      if (this.state === 'PLAYING' || this.state === 'ANIMATING' || this.state === 'CELEBRATING') {
+        this._renderSimBackground(ts);
+        this._renderFXCanvas(dt);
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  _renderSimBackground(t) {
+    if (this.settings.inputMode === 'camera') return;
+    const canvas = document.getElementById('bgSimCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+
+    const grad = ctx.createLinearGradient(0, 0, w, h);
+    grad.addColorStop(0, '#240d0e');
+    grad.addColorStop(0.5, '#311612');
+    grad.addColorStop(1, '#190b0c');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
+    const bokehs = [
+      { x: 0.16, y: 0.18, r: 48, c: 'rgba(239, 68, 68, 0.26)' },
+      { x: 0.84, y: 0.16, r: 52, c: 'rgba(245, 158, 11, 0.22)' },
+      { x: 0.78, y: 0.64, r: 56, c: 'rgba(234, 88, 12, 0.18)' },
+      { x: 0.2, y: 0.7, r: 44, c: 'rgba(251, 191, 36, 0.18)' },
+    ];
+    bokehs.forEach((b, i) => {
+      const bx = b.x * w + Math.sin(t * 0.0008 + i) * 10;
+      const by = b.y * h + Math.cos(t * 0.0007 + i) * 8;
+      const rg = ctx.createRadialGradient(bx, by, 2, bx, by, b.r);
+      rg.addColorStop(0, b.c);
+      rg.addColorStop(1, 'transparent');
+      ctx.fillStyle = rg;
+      ctx.beginPath();
+      ctx.arc(bx, by, b.r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    const sway = Math.sin(t * 0.0014) * 6;
+    const cx = w * 0.5 + sway;
+    const cy = h * 0.58;
+    ctx.save();
+    ctx.fillStyle = 'rgba(14, 6, 6, 0.44)';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - h * 0.24, w * 0.095, h * 0.095, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(cx, cy + h * 0.12, w * 0.26, h * 0.34, 0, Math.PI, Math.PI * 2);
+    ctx.lineTo(cx + w * 0.26, h);
+    ctx.lineTo(cx - w * 0.26, h);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  _renderFXCanvas(dt) {
+    const canvas = document.getElementById('fxCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const isRev = !!this.currentTask?.isReverse;
+
+    // 1. 手部發光光軌
+    if (this.trail.length > 1) {
+      for (let i = 1; i < this.trail.length; i++) {
+        const p0 = this.trail[i - 1];
+        const p1 = this.trail[i];
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(p0.x, p0.y);
+        ctx.lineTo(p1.x, p1.y);
+        ctx.lineCap = 'round';
+        ctx.lineWidth = Math.max(2, p1.life * 14);
+        ctx.strokeStyle = isRev ? `rgba(56, 189, 248, ${p1.life * 0.85})` : `rgba(251, 191, 36, ${p1.life * 0.85})`;
+        ctx.shadowColor = isRev ? '#38bdf8' : '#f59e0b';
+        ctx.shadowBlur = 15;
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+    this.trail.forEach((pt) => { pt.life -= dt * 3.4; });
+    this.trail = this.trail.filter((pt) => pt.life > 0);
+
+    if (this.trail.length > 0) {
+      const head = this.trail[this.trail.length - 1];
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(head.x, head.y, 10, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = isRev ? '#38bdf8' : '#fbbf24';
+      ctx.shadowBlur = 22;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // 2. 衝擊波環
+    this.rings.forEach((r) => {
+      r.r += (r.maxR - r.r) * 0.22;
+      r.life -= dt * 2.8;
+      if (r.life > 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+        ctx.strokeStyle = r.color;
+        ctx.globalAlpha = r.life * 0.8;
+        ctx.lineWidth = 6 * r.life;
+        ctx.stroke();
+        ctx.restore();
+      }
+    });
+    this.rings = this.rings.filter((r) => r.life > 0);
+
+    // 3. 銳利斬擊光刃
+    this.slashes.forEach((s) => {
+      s.life -= dt * 3.0;
+      if (s.life > 0) {
+        const half = s.len / 2;
+        const x1 = s.cx - Math.cos(s.angle) * half;
+        const y1 = s.cy - Math.sin(s.angle) * half;
+        const x2 = s.cx + Math.cos(s.angle) * half;
+        const y2 = s.cy + Math.sin(s.angle) * half;
+
+        ctx.save();
+        ctx.globalAlpha = s.life;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = s.color;
+        ctx.shadowColor = s.color;
+        ctx.shadowBlur = 28;
+        ctx.lineWidth = 22 * s.life;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = s.core;
+        ctx.lineWidth = 7 * s.life;
+        ctx.stroke();
+        ctx.restore();
+      }
+    });
+    this.slashes = this.slashes.filter((s) => s.life > 0);
+
+    // 4. 烹飪火花與粉塵／水滴粒子
+    this.sparks.forEach((sp) => {
+      sp.x += sp.vx;
+      sp.y += sp.vy;
+      sp.vy += 0.22;
+      sp.life -= sp.decay;
+      if (sp.life > 0) {
+        ctx.save();
+        ctx.globalAlpha = sp.life;
+        ctx.fillStyle = sp.color;
+        ctx.shadowColor = sp.color;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, sp.size * sp.life, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    });
+    this.sparks = this.sparks.filter((sp) => sp.life > 0);
+
+    // 5. 香氣蒸氣與浮動文字
+    this.steams.forEach((st) => {
+      st.x += st.vx;
+      st.y += st.vy;
+      st.r += 0.45;
+      st.life -= dt * 1.4;
+      if (st.life > 0) {
+        ctx.save();
+        ctx.globalAlpha = st.life * 0.32;
+        ctx.fillStyle = '#fffbeb';
+        ctx.beginPath();
+        ctx.arc(st.x, st.y, st.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    });
+    this.steams = this.steams.filter((st) => st.life > 0);
+
+    this.callouts.forEach((c) => {
+      c.y -= dt * 36;
+      c.life -= dt * 1.25;
+      if (c.life > 0) {
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, c.life * 1.3);
+        ctx.font = "900 22px 'Noto Sans TC', sans-serif";
+        ctx.textAlign = 'center';
+        ctx.fillStyle = c.color;
+        ctx.shadowColor = 'rgba(0,0,0,0.85)';
+        ctx.shadowBlur = 10;
+        ctx.fillText(c.text, c.x, c.y);
+        ctx.restore();
+      }
+    });
+    this.callouts = this.callouts.filter((c) => c.life > 0);
+  }
+
   _initCalibrationModal() {
     this.calibSwipes = [];
     this.calibStartPt = null;
@@ -775,7 +1556,7 @@ class NightMarketGame {
       this.calibSwipes.push(d);
       this.calibStartPt = { x, y };
       document.getElementById('calibCount').textContent = `${this.calibSwipes.length} / 3`;
-      this.sound.playSliceSuccess();
+      this.sound.playPrepSound('cut', false);
 
       const avg = this.calibSwipes.reduce((a, b) => a + b, 0) / this.calibSwipes.length;
       const recommended = Math.min(40, Math.max(8, Math.round(avg * 0.85 * 100)));

@@ -1841,3 +1841,103 @@ input[type="range"] {
     margin: 4px auto 0 !important;
   }
 }
+
+
+/* === V2.4 左右滑動式精簡關卡卡片 === */
+.swipe-hint-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fde68a;
+  background: rgba(251, 191, 36, 0.14);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  padding: 2px 8px;
+  border-radius: 999px;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+.stage-carousel-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stage-nav-btn {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 64px;
+  border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(34, 14, 10, 0.78);
+  color: #fde68a;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s, transform 0.12s;
+}
+.stage-nav-btn:hover {
+  background: rgba(251, 191, 36, 0.22);
+}
+.stage-nav-btn:active {
+  transform: scale(0.94);
+}
+.stage-card-grid {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  scroll-snap-type: x mandatory;
+  gap: 12px !important;
+  padding: 4px 2px 10px !important;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(251, 191, 36, 0.45) transparent;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.stage-card-grid::-webkit-scrollbar {
+  height: 6px;
+}
+.stage-card-grid::-webkit-scrollbar-thumb {
+  background: rgba(251, 191, 36, 0.45);
+  border-radius: 999px;
+}
+.stage-card {
+  flex: 0 0 228px !important;
+  width: 228px !important;
+  scroll-snap-align: start;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 0 !important;
+}
+.stage-thumb-wrap {
+  height: 102px !important;
+}
+.stage-card-body {
+  padding: 8px 10px 10px !important;
+}
+.stage-card-body strong {
+  font-size: 0.94rem !important;
+}
+.stage-card-body p {
+  font-size: 0.75rem !important;
+  line-height: 1.35 !important;
+  margin: 4px 0 0 !important;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+@media (max-width: 600px) {
+  .stage-nav-btn {
+    display: none !important;
+  }
+  .stage-card {
+    flex: 0 0 205px !important;
+    width: 205px !important;
+  }
+  .stage-thumb-wrap {
+    height: 90px !important;
+  }
+}

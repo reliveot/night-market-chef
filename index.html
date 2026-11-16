@@ -48,10 +48,12 @@
       <!-- ① 遊戲選關卡卡片（4 張水彩插畫關卡） -->
       <div class="card">
         <div class="section-head">
-          <h2>① 選擇挑戰關卡</h2>
+          <h2>① 選擇挑戰關卡 <small class="swipe-hint-pill">← 左右滑動選關 →</small></h2>
           <span id="presetStatusBadge" class="preset-status-badge">目前選擇：🟢 關卡一｜大廚上工</span>
         </div>
-        <div class="stage-card-grid">
+        <div class="stage-carousel-wrap">
+          <button type="button" id="btnStagePrev" class="stage-nav-btn prev" aria-label="上一個關卡">‹</button>
+          <div id="stageCardGrid" class="stage-card-grid">
           <button class="stage-card tier-green active" data-preset="easy">
             <div class="stage-thumb-wrap">
               <img src="assets/common/stage_action.webp?v=2.2" alt="大廚上工" loading="lazy" />
@@ -95,6 +97,8 @@
               <p>八方向、正反兩刀連擊、壞食材抑制與烹飪出餐全面啟動；適合全方位進階挑戰。</p>
             </div>
           </button>
+          </div>
+          <button type="button" id="btnStageNext" class="stage-nav-btn next" aria-label="下一個關卡">›</button>
         </div>
       </div>
 

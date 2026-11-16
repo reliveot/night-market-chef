@@ -246,8 +246,44 @@ class NightMarketGame {
       });
     };
 
+    bindSeg('ctrlGameMode', 'gameMode');
+    bindSeg('ctrlDishCount', 'targetDishes', true);
+    bindSeg('ctrlTimeSec', 'timeLimitSec', true);
+    bindSeg('ctrlCategoryFilter', 'categoryFilter');
     bindSeg('ctrlTrainingMode', 'trainingMode');
+    bindSeg('ctrlCogChoices', 'cogChoices', true);
     bindSeg('ctrlStirMode', 'stirMode');
+    bindSeg('ctrlStirMult', 'stirMult', true);
+    bindSeg('ctrlDirRule', 'dirRule');
+    bindSeg('ctrlAngleTol', 'angleTol', true);
+    bindSeg('ctrlInputMode', 'inputMode');
+
+    // 方向組合預設按鈕
+    const dirPresetEl = document.getElementById('ctrlDirPreset');
+    if (dirPresetEl) {
+      dirPresetEl.querySelectorAll('button').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          dirPresetEl.querySelectorAll('button').forEach((b) => b.classList.remove('active'));
+          btn.classList.add('active');
+          const v = btn.dataset.val;
+          if (v === '4') this.settings.allowedDirs = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
+          else if (v === '8') this.settings.allowedDirs = ['UP', 'UR', 'RIGHT', 'DR', 'DOWN', 'DL', 'LEFT', 'UL'];
+          else if (v === 'high') this.settings.allowedDirs = ['UP', 'UL', 'UR'];
+          else if (v === 'wide') this.settings.allowedDirs = ['LEFT', 'RIGHT'];
+          this._syncDirChipsUI();
+          this._markCustomPreset();
+        });
+      });
+    }
+
+    // 關卡左右滑動按鈕
+    const stageGrid = document.getElementById('stageCardGrid');
+    document.getElementById('btnStagePrev')?.addEventListener('click', () => {
+      stageGrid?.scrollBy({ left: -240, behavior: 'smooth' });
+    });
+    document.getElementById('btnStageNext')?.addEventListener('click', () => {
+      stageGrid?.scrollBy({ left: 240, behavior: 'smooth' });
+    });
     document.querySelectorAll('#quickLengthRow .len-pill').forEach((pill) => {
       pill.addEventListener('click', () => {
         document.querySelectorAll('#quickLengthRow .len-pill').forEach((p) => p.classList.remove('active'));
@@ -321,6 +357,7 @@ class NightMarketGame {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.stage-card').forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
+        btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
         this._applyPreset(btn.dataset.preset);
       });
     });

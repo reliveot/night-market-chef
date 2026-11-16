@@ -637,8 +637,8 @@ input[type="range"] {
 
 .food-hero-wrap {
   position: relative;
-  width: clamp(210px, 45vw, 320px);
-  height: clamp(210px, 45vw, 320px);
+  width: clamp(250px, min(62vw, 40dvh), 420px);
+  height: clamp(250px, min(62vw, 40dvh), 420px);
   display: grid;
   place-items: center;
 }
@@ -703,8 +703,8 @@ input[type="range"] {
 
 .food-img-box {
   position: relative;
-  width: 88%;
-  height: 88%;
+  width: 96%;
+  height: 96%;
   display: grid;
   place-items: center;
   animation: foodFloat 3s ease-in-out infinite;
@@ -1228,8 +1228,8 @@ input[type="range"] {
   color: var(--gold-normal);
 }
 .celebrate-dish-img {
-  width: 190px;
-  height: 190px;
+  width: clamp(210px, 44vw, 290px);
+  height: clamp(210px, 44vw, 290px);
   object-fit: contain;
   margin: 10px auto;
   display: block;
@@ -1904,15 +1904,15 @@ input[type="range"] {
   border-radius: 999px;
 }
 .stage-card {
-  flex: 0 0 228px !important;
-  width: 228px !important;
+  flex: 0 0 272px !important;
+  width: 272px !important;
   scroll-snap-align: start;
   display: flex !important;
   flex-direction: column !important;
   padding: 0 !important;
 }
 .stage-thumb-wrap {
-  height: 102px !important;
+  height: 158px !important;
 }
 .stage-card-body {
   padding: 8px 10px 10px !important;
@@ -1934,10 +1934,10 @@ input[type="range"] {
     display: none !important;
   }
   .stage-card {
-    flex: 0 0 205px !important;
-    width: 205px !important;
+    flex: 0 0 246px !important;
+    width: 246px !important;
   }
   .stage-thumb-wrap {
-    height: 90px !important;
+    height: 142px !important;
   }
 }

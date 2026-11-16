@@ -907,43 +907,6 @@ input[type="range"] {
   display: block;
 }
 
-.stir-meter-wrap {
-  margin-top: 8px;
-  width: min(72vw, 260px);
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.stir-meter-wrap.active {
-  display: flex;
-}
-
-.stir-bar-bg {
-  width: 100%;
-  height: 14px;
-  border-radius: 999px;
-  background: rgba(24, 10, 10, 0.85);
-  border: 1.5px solid rgba(251, 191, 36, 0.45);
-  overflow: hidden;
-}
-
-.stir-bar-fill {
-  width: 0%;
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #dc2626, #f97316, #fbbf24);
-  box-shadow: 0 0 12px rgba(251, 191, 36, 0.9);
-  transition: width 0.08s linear;
-}
-
-.stir-pct-text {
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--gold-normal);
-}
-
 .food-caption {
   margin-top: 10px;
   display: flex;
@@ -1625,61 +1588,17 @@ input[type="range"] {
   color: rgba(254, 243, 199, 0.78);
 }
 
-/* === V2.2 修正：上方 HUD 與料理卡片絕對不重疊（含開啟鏡頭與手機橫直向） === */
-.arcade-root {
-  display: flex;
-  flex-direction: column;
-  height: 100dvh;
-  overflow: hidden;
-}
-.arcade-hud {
-  position: relative !important;
-  flex: 0 0 auto;
-  z-index: 35;
-  padding: 10px 14px;
-  background: linear-gradient(180deg, rgba(16, 7, 7, 0.88) 0%, rgba(16, 7, 7, 0.55) 100%);
-  backdrop-filter: blur(6px);
-}
-.quick-guide-bar {
-  position: relative !important;
-  top: auto !important;
-  left: auto !important;
-  transform: none !important;
-  margin: 6px auto 0 !important;
-  z-index: 32;
-  flex: 0 0 auto;
-}
+/* === 遊戲舞台垂直彈性排版（上 HUD / 中央主舞台 / 下備料盤 絕不重疊） === */
 .arcade-stage {
-  position: relative !important;
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  padding-top: 8px !important;
-  padding-bottom: 12px !important;
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 6px 0 8px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   z-index: 15;
 }
-.arcade-center {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-.stir-wok {
-  font-size: 3rem;
-  line-height: 1;
-  margin-bottom: 6px;
-  animation: wokShake 0.45s infinite alternate ease-in-out;
-}
-@keyframes wokShake {
-  from { transform: rotate(-8deg) scale(1); }
-  to { transform: rotate(8deg) scale(1.08); }
-}
-
 
 /* === V2.3 動作專屬小 ICON、強化下鍋/翻面與六種烹飪動畫、手機 HUD 防重疊 === */
 .food-caption {
@@ -1801,11 +1720,6 @@ input[type="range"] {
 
 /* 手機直向上方 HUD 與導引條防重疊 */
 @media (max-width: 720px) {
-  .arcade-hud {
-    padding: 6px 8px !important;
-    gap: 6px !important;
-    flex-wrap: nowrap !important;
-  }
   .hud-dish-thumb {
     width: 32px !important;
     height: 32px !important;
@@ -1840,14 +1754,7 @@ input[type="range"] {
     font-size: 0.74rem !important;
     white-space: nowrap;
   }
-  .quick-guide-bar {
-    width: calc(100% - 16px) !important;
-    font-size: 0.74rem !important;
-    padding: 5px 10px !important;
-    margin: 4px auto 0 !important;
-  }
 }
-
 
 /* === V2.4 左右滑動式精簡關卡卡片 === */
 .swipe-hint-pill {
@@ -2029,4 +1936,71 @@ input[type="range"] {
   border-color: #fbbf24 !important;
   color: #fef08a !important;
   box-shadow: 0 4px 16px rgba(249, 115, 22, 0.45);
+}
+
+/* === V2.5 手機直向 Top HUD 兩排防重疊 === */
+@media (max-width: 720px) {
+  .top-hud {
+    flex-wrap: wrap !important;
+    border-radius: 18px !important;
+    padding: 7px 10px !important;
+    gap: 6px 8px !important;
+    width: calc(100% - 16px) !important;
+  }
+  .hud-dish {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .hud-center-badge {
+    margin-left: auto;
+    flex-direction: row !important;
+    gap: 6px !important;
+    padding: 3px 8px !important;
+    border-radius: 999px;
+    background: rgba(251, 191, 36, 0.12);
+    border: 1px solid rgba(251, 191, 36, 0.28);
+  }
+  .hud-actions {
+    width: 100%;
+    justify-content: space-between;
+    gap: 4px !important;
+  }
+  .hud-btn {
+    height: 30px !important;
+    min-width: 30px !important;
+    padding: 0 8px !important;
+    font-size: 0.74rem !important;
+  }
+}
+
+/* === V2.5 認知選餐大字大圖＋全畫面分區高亮 === */
+.cog-choice-arena {
+  width: min(96vw, 760px) !important;
+  height: min(54dvh, 460px) !important;
+}
+.cog-card {
+  width: clamp(148px, 31vw, 224px) !important;
+  padding: 14px 10px !important;
+  gap: 8px !important;
+  border-radius: 24px !important;
+}
+.cog-card-img-wrap {
+  width: clamp(92px, 18vw, 134px) !important;
+  height: clamp(92px, 18vw, 134px) !important;
+}
+.cog-card-title {
+  font-size: clamp(19px, 3.2vw, 25px) !important;
+  line-height: 1.2;
+  text-align: center;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.75);
+}
+.cog-card-dir {
+  font-size: 13px !important;
+  padding: 3px 12px !important;
+}
+.cog-card.hovering {
+  border-width: 3px !important;
+  border-color: #4ade80 !important;
+  background: linear-gradient(160deg, rgba(20, 83, 45, 0.92), rgba(14, 48, 28, 0.94)) !important;
+  box-shadow: 0 0 32px rgba(74, 222, 128, 0.75) !important;
 }

@@ -11,11 +11,13 @@ export class InputTracker {
     this.lowPerfMode = false;
 
     this.handLandmarker = null;
+    this.modelInitPromise = null;
     this.stream = null;
     this.isRunning = false;
     this.isInferencing = false;
     this.inferTimer = null;
     this.lostFrames = 0;
+    this.lastInferTs = 0;
 
     // 效能自動降級監測器
     this.inferCostHistory = [];
@@ -31,12 +33,15 @@ export class InputTracker {
 
   async initHandLandmarker() {
     if (this.handLandmarker) return true;
-    try {
-      const vision = await FilesetResolver.forVisionTasks(
-        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
-      );
+    if (this.modelInitPromise) return this.modelInitPromise;
+
+    this.callbacks.onModelLoading?.();
+    this.modelInitPromise = (async () => {
       try {
-        this.handLandmarker = await HandLandmarker.createFromOptions(vision, {
+        const vision = await FilesetResolver.forVisionTasks(
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
+        );
+        const opts = {
           baseOptions: {
             modelAssetPath:
               'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
@@ -44,30 +49,27 @@ export class InputTracker {
           },
           runningMode: 'VIDEO',
           numHands: 1,
-          minHandDetectionConfidence: 0.45,
-          minHandPresenceConfidence: 0.45,
-          minTrackingConfidence: 0.45,
-        });
-      } catch {
-        // iPad / iOS Safari 若 GPU delegate 失敗，自動切換為 CPU delegate
-        this.handLandmarker = await HandLandmarker.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath:
-              'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
-            delegate: 'CPU',
-          },
-          runningMode: 'VIDEO',
-          numHands: 1,
-          minHandDetectionConfidence: 0.45,
-          minHandPresenceConfidence: 0.45,
-          minTrackingConfidence: 0.45,
-        });
+          minHandDetectionConfidence: 0.35,
+          minHandPresenceConfidence: 0.35,
+          minTrackingConfidence: 0.35,
+        };
+        try {
+          this.handLandmarker = await HandLandmarker.createFromOptions(vision, opts);
+        } catch {
+          // iPad / iOS / Android WebGL 若 GPU delegate 失敗，自動切換為 CPU delegate
+          opts.baseOptions.delegate = 'CPU';
+          this.handLandmarker = await HandLandmarker.createFromOptions(vision, opts);
+        }
+        this.callbacks.onModelReady?.();
+        return true;
+      } catch (err) {
+        console.warn('HandLandmarker init error:', err);
+        this.modelInitPromise = null;
+        return false;
       }
-      return true;
-    } catch (err) {
-      console.warn('HandLandmarker init error:', err);
-      return false;
-    }
+    })();
+
+    return this.modelInitPromise;
   }
 
   async start(mode, options = {}) {
@@ -77,9 +79,9 @@ export class InputTracker {
     this.lowPerfMode = options.lowPerf ?? false;
     this.isRunning = true;
     this.inferCostHistory = [];
+    this.lastInferTs = 0;
 
     if (mode === 'camera') {
-      // 重要：於使用者點擊手勢當下立即請求攝影機並播放，避免 iPad Safari 因等待模型下載而使播放權限過期
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error('Camera API unavailable');
       }
@@ -110,7 +112,7 @@ export class InputTracker {
         };
       }
 
-      // 鏡頭畫面已成功顯示後，再非同步啟動 AI 手部模型推論（不阻塞鏡頭畫面）
+      // 鏡頭畫面已成功顯示後，非同步啟動 AI 手部模型推論
       this.initHandLandmarker().then((ready) => {
         if (!this.isRunning || this.mode !== 'camera') return;
         if (ready) {
@@ -153,12 +155,30 @@ export class InputTracker {
 
   async _runCameraInference() {
     if (!this.isRunning || this.isInferencing || !this.handLandmarker || !this.videoEl || this.videoEl.readyState < 2) return;
+    const vw = this.videoEl.videoWidth || 640;
+    const vh = this.videoEl.videoHeight || 480;
+    if (vw === 0 || vh === 0) return;
+
     this.isInferencing = true;
 
     try {
+      // 依真實鏡頭比例設定離屏畫布（手機直向 3:4 時為 192x256，橫向 4:3 為 256x192），避免壓扁手部導致辨識失敗
+      const maxDim = 256;
+      const cw = vw >= vh ? maxDim : Math.max(128, Math.round((vw / vh) * maxDim));
+      const ch = vh > vw ? maxDim : Math.max(128, Math.round((vh / vw) * maxDim));
+      if (this.offscreenCanvas.width !== cw || this.offscreenCanvas.height !== ch) {
+        this.offscreenCanvas.width = cw;
+        this.offscreenCanvas.height = ch;
+      }
+
       const t0 = performance.now();
-      this.offscreenCtx.drawImage(this.videoEl, 0, 0, 256, 192);
-      const result = this.handLandmarker.detectForVideo(this.offscreenCanvas, t0);
+      this.offscreenCtx.drawImage(this.videoEl, 0, 0, cw, ch);
+
+      // MediaPipe VIDEO 模式必須使用嚴格遞增的整數毫秒 timestamp
+      const ts = Math.max(this.lastInferTs + 1, Math.round(t0));
+      this.lastInferTs = ts;
+
+      const result = this.handLandmarker.detectForVideo(this.offscreenCanvas, ts);
       const inferCostMs = performance.now() - t0;
 
       if (!this.lowPerfMode && !this.autoDowngraded) {

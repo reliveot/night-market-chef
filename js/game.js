@@ -30,6 +30,9 @@ class SoundEngine {
     this.soundEnabled = true;
     this.voiceEnabled = true;
     this.bgmEnabled = true;
+    this.sfxVolume = 0.8;
+    this.bgmVolume = 0.6;
+    this.voiceVolume = 0.9;
     this.bgmTimer = null;
     this.bgmStep = 0;
     this._noiseBuffer = null;
@@ -68,7 +71,9 @@ class SoundEngine {
       if (endFreq && endFreq > 0) {
         osc.frequency.exponentialRampToValueAtTime(endFreq, now + dur);
       }
-      gain.gain.setValueAtTime(Math.max(0.001, gainVal), now);
+      const g = Math.max(0.0001, gainVal * this.sfxVolume);
+      if (this.sfxVolume <= 0.001) return;
+      gain.gain.setValueAtTime(g, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
       osc.connect(gain);
       gain.connect(this.ctx.destination);
@@ -91,7 +96,9 @@ class SoundEngine {
         filter.frequency.setValueAtTime(freq, now);
         filter.Q.setValueAtTime(q, now);
         const gain = this.ctx.createGain();
-        gain.gain.setValueAtTime(Math.max(0.001, gainVal), now);
+        const g = Math.max(0.0001, gainVal * this.sfxVolume);
+      if (this.sfxVolume <= 0.001) return;
+      gain.gain.setValueAtTime(g, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
         src.connect(filter);
         filter.connect(gain);
@@ -189,7 +196,9 @@ class SoundEngine {
       filter.type = 'lowpass';
       filter.frequency.setValueAtTime(1600, now);
       gain.gain.setValueAtTime(0.001, now);
-      gain.gain.linearRampToValueAtTime(gainVal, now + 0.012);
+      const bg = gainVal * (this.bgmVolume / 0.6);
+      if (bg <= 0.0005) return;
+      gain.gain.linearRampToValueAtTime(bg, now + 0.012);
       gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
       osc.connect(filter);
       filter.connect(gain);
@@ -208,7 +217,9 @@ class SoundEngine {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(isAccent ? 760 : 580, now);
       osc.frequency.exponentialRampToValueAtTime(isAccent ? 520 : 410, now + 0.045);
-      gain.gain.setValueAtTime(isAccent ? 0.032 : 0.02, now);
+      const bg = (isAccent ? 0.032 : 0.02) * (this.bgmVolume / 0.6);
+      if (bg <= 0.0005) return;
+      gain.gain.setValueAtTime(bg, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
       osc.connect(gain);
       gain.connect(this.ctx.destination);
@@ -273,9 +284,11 @@ class SoundEngine {
     if (!this.voiceEnabled || !('speechSynthesis' in window) || !text) return;
     try {
       if (interrupt) window.speechSynthesis.cancel();
+      if (this.voiceVolume <= 0.01) return;
       const utter = new SpeechSynthesisUtterance(text);
       utter.lang = 'zh-TW';
-      utter.rate = 1.06;
+      utter.rate = 1.32;
+      utter.volume = Math.max(0, Math.min(1, this.voiceVolume));
       window.speechSynthesis.speak(utter);
     } catch {}
   }
@@ -567,6 +580,24 @@ class NightMarketGame {
         this.sound.stopBgm();
       }
       this._syncBgmBtnUI();
+    });
+    document.getElementById('rngSfxVol')?.addEventListener('input', (e) => {
+      const v = Number(e.target.value);
+      this.sound.sfxVolume = v / 100;
+      const lbl = document.getElementById('lblSfxVol');
+      if (lbl) lbl.textContent = `${v}%`;
+    });
+    document.getElementById('rngBgmVol')?.addEventListener('input', (e) => {
+      const v = Number(e.target.value);
+      this.sound.bgmVolume = v / 100;
+      const lbl = document.getElementById('lblBgmVol');
+      if (lbl) lbl.textContent = `${v}%`;
+    });
+    document.getElementById('rngVoiceVol')?.addEventListener('input', (e) => {
+      const v = Number(e.target.value);
+      this.sound.voiceVolume = v / 100;
+      const lbl = document.getElementById('lblVoiceVol');
+      if (lbl) lbl.textContent = `${v}%`;
     });
     document.getElementById('btnStartCustom').addEventListener('click', () => this.startGame());
 
@@ -1130,14 +1161,14 @@ class NightMarketGame {
 
     ruleBanner.className = `rule-banner ${isReverse ? 'reverse' : 'normal'}`;
     if (isReverse) {
-      ruleBanner.textContent = `🧠 反方向挑戰！往箭頭「相反方向」揮 (${activeIcon}${activeTag})`;
-      hintSubEl.textContent = '看見青藍色箭頭，請往相反方向揮動！';
+      ruleBanner.textContent = '🧠 往箭頭「相反方向」揮';
+      hintSubEl.textContent = '看見青藍色箭頭，請往相反方向揮';
     } else if (step.isFinish && cookMeta) {
-      ruleBanner.textContent = `${cookMeta.badge}｜揮一下即可出餐！`;
-      hintSubEl.textContent = `往暖金黃箭頭方向揮一下，完成「${cookMeta.actionName}」！`;
+      ruleBanner.textContent = cookMeta.badge;
+      hintSubEl.textContent = '';
     } else {
-      ruleBanner.textContent = `🏮 照箭頭方向揮動 (${activeIcon}${activeTag})`;
-      hintSubEl.textContent = `往暖金黃箭頭方向揮動，執行「${activeTag}」！`;
+      ruleBanner.textContent = '🏮 照箭頭方向揮動';
+      hintSubEl.textContent = '';
     }
 
     if (step.isFinish && cookMeta) {
@@ -1561,7 +1592,7 @@ class NightMarketGame {
   _triggerDishComplete() {
     this.state = 'CELEBRATING';
     this.sound.playDishComplete();
-    this.sound.speak(`出餐成功！${this.currentDish.name}`);
+    this.sound.speak(`${this.currentDish.name}完成`);
 
     this.stats.dishes++;
     this.stats.coins += 100;

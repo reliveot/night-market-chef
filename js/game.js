@@ -6,10 +6,22 @@ import { AssetManager } from './preloader.js';
 const STORAGE_KEY_COLLECTION = 'tw_night_market_chef_unlocked_v1';
 
 const PREP_LABELS = {
-  cut:      { icon: '🔪', tag: '切菜刀法', callout: '🔪 一刀兩斷！', anim: 'anim-cut' },
-  sprinkle: { icon: '🧂', tag: '撒粉淋醬', callout: '🧂 香氣提味！', anim: 'anim-sprinkle' },
-  pour:     { icon: '🥣', tag: '鮮料下鍋', callout: '🥣 鮮料下鍋！', anim: 'anim-pour' },
-  flip:     { icon: '🔥', tag: '帥氣翻面', callout: '🔥 帥氣翻面！', anim: 'anim-flip' },
+  cut: {
+    icon: '🔪', tag: '切菜刀法', callout: '🔪 一刀兩斷！', anim: 'anim-cut',
+    svg: `<svg class="act-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 3L8 14l3 3L22 6l-3-3z" fill="currentColor" fill-opacity="0.22"/><path d="M8 14l-5 5"/><path d="M11 17l-2 2"/></svg>`
+  },
+  sprinkle: {
+    icon: '🧂', tag: '撒粉淋醬', callout: '🧂 香氣提味！', anim: 'anim-sprinkle',
+    svg: `<svg class="act-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="8" width="10" height="12" rx="2" fill="currentColor" fill-opacity="0.18"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/><circle cx="10" cy="3" r="0.8" fill="currentColor"/><circle cx="14" cy="3" r="0.8" fill="currentColor"/><circle cx="12" cy="2" r="0.8" fill="currentColor"/></svg>`
+  },
+  pour: {
+    icon: '🥣', tag: '鮮料下鍋', callout: '🥣 鮮料下鍋！', anim: 'anim-pour',
+    svg: `<svg class="act-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13a8 8 0 0 0 16 0H4z" fill="currentColor" fill-opacity="0.22"/><path d="M12 4v5"/><path d="M9.5 6.5L12 9l2.5-2.5"/><path d="M7 20h10"/></svg>`
+  },
+  flip: {
+    icon: '🍳', tag: '帥氣翻面', callout: '🔥 帥氣翻面！', anim: 'anim-flip',
+    svg: `<svg class="act-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4l5 5-6 6-5-5 6-6z" fill="currentColor" fill-opacity="0.22"/><path d="M9 15l-5 5"/><path d="M5 9a6 6 0 0 1 8-4"/><path d="M5 6v3h3"/></svg>`
+  },
 };
 
 class SoundEngine {
@@ -117,6 +129,7 @@ class NightMarketGame {
       enableSpoiled: false,
       enableDoubleCut: false,
       enableStir: true,
+      stirMode: 'random',
       stirMult: 5,
       distThreshold: 0.15,
       mirrored: true,
@@ -226,6 +239,7 @@ class NightMarketGame {
           if (key === 'trainingMode') {
             document.getElementById('groupCogChoices')?.classList.toggle('hidden', this.settings.trainingMode !== 'cognitive');
             document.getElementById('rowEnableStir')?.classList.toggle('hidden', this.settings.trainingMode === 'cognitive');
+            document.getElementById('ctrlStirMode')?.classList.toggle('hidden', this.settings.trainingMode === 'cognitive');
             document.getElementById('ctrlStirMult')?.classList.toggle('hidden', this.settings.trainingMode === 'cognitive');
           }
         });
@@ -233,6 +247,7 @@ class NightMarketGame {
     };
 
     bindSeg('ctrlTrainingMode', 'trainingMode');
+    bindSeg('ctrlStirMode', 'stirMode');
     document.querySelectorAll('#quickLengthRow .len-pill').forEach((pill) => {
       pill.addEventListener('click', () => {
         document.querySelectorAll('#quickLengthRow .len-pill').forEach((p) => p.classList.remove('active'));
@@ -384,6 +399,58 @@ class NightMarketGame {
     window.addEventListener('resize', () => this._resizeCanvases());
   }
 
+  getCookMeta(dish) {
+    const cat = dish?.category || '';
+    const name = dish?.name || '';
+    const isDrink = /奶茶|檸檬|牛奶|甘蔗汁|紅茶|愛玉|冬瓜/.test(name);
+    if (cat === '煎台料理') {
+      return {
+        typeKey: 'teppan', actionName: '鐵板煎炒', badge: '🍳 鐵板煎炒', icon: '🍳',
+        verb: '揮動鐵板滋滋煎炒', color: '#fb923c',
+        cookImg: 'assets/common/cook_teppan.webp?v=2.3', cookAnim: 'anim-cook-teppan',
+        svg: `<svg class="act-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="11" cy="14" rx="8" ry="4" fill="currentColor" fill-opacity="0.2"/><path d="M19 14l3-2"/><path d="M8 7c0-1.5 1-2 1-3M12 7c0-1.5 1-2 1-3"/></svg>`
+      };
+    }
+    if (cat === '油炸料理') {
+      return {
+        typeKey: 'fry', actionName: '酥炸甩油', badge: '🧺 酥炸起鍋', icon: '🧺',
+        verb: '晃動炸網金黃甩油', color: '#facc15',
+        cookImg: 'assets/common/cook_fry.webp?v=2.3', cookAnim: 'anim-cook-fry',
+        svg: `<svg class="act-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 10h12l-2 9H7l-2-9z" fill="currentColor" fill-opacity="0.2"/><path d="M17 10l4-4"/><circle cx="9" cy="6" r="1"/><circle cx="13" cy="5" r="1"/></svg>`
+      };
+    }
+    if (cat === '炭烤料理') {
+      return {
+        typeKey: 'grill', actionName: '炭火翻烤', badge: '🍢 炭火翻烤', icon: '🍢',
+        verb: '炭火翻烤刷上醬香', color: '#f87171',
+        cookImg: 'assets/common/cook_grill.webp?v=2.3', cookAnim: 'anim-cook-grill',
+        svg: `<svg class="act-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 13h16M6 16h12M8 19h8" stroke-linecap="round"/><path d="M9 10c0-2 2-3 2-5 1.5 1.5 2 3 2 5" fill="currentColor" fill-opacity="0.25"/></svg>`
+      };
+    }
+    if (cat === '熱食與湯品') {
+      return {
+        typeKey: 'boil', actionName: '大鍋滾煮', badge: '🍲 大鍋滾煮', icon: '🍲',
+        verb: '大鍋滾煮熱氣蒸騰', color: '#fbbf24',
+        cookImg: 'assets/common/cook_boil.webp?v=2.3', cookAnim: 'anim-cook-boil',
+        svg: `<svg class="act-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 11h14v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4v-6z" fill="currentColor" fill-opacity="0.2"/><path d="M3 11h18"/><path d="M9 7V4M15 7V4"/></svg>`
+      };
+    }
+    if (isDrink) {
+      return {
+        typeKey: 'shake', actionName: '手搖搖勻', badge: '🧋 手搖搖勻', icon: '🧋',
+        verb: '雪克杯上下搖勻冰涼', color: '#38bdf8',
+        cookImg: 'assets/common/cook_shake.webp?v=2.3', cookAnim: 'anim-cook-shake',
+        svg: `<svg class="act-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 7h8l-1 13H9L8 7z" fill="currentColor" fill-opacity="0.22"/><path d="M9 7l1-3h4l1 3"/><path d="M4 11l-1 3M20 11l1 3"/></svg>`
+      };
+    }
+    return {
+      typeKey: 'mix', actionName: '手工拌料', badge: '🍧 手工拌料', icon: '🍧',
+      verb: '甜品碗拌勻配料淋醬', color: '#f472b6',
+      cookImg: 'assets/common/cook_mix.webp?v=2.3', cookAnim: 'anim-cook-mix',
+      svg: `<svg class="act-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16a8 8 0 0 1-16 0z" fill="currentColor" fill-opacity="0.22"/><path d="M14 12l5-7"/></svg>`
+    };
+  }
+
   _markCustomPreset() {
     document.querySelectorAll('.stage-card').forEach((b) => b.classList.remove('active'));
     const badge = document.getElementById('presetStatusBadge');
@@ -466,6 +533,7 @@ class NightMarketGame {
     document.getElementById('chkEnableSpoiled').checked = this.settings.enableSpoiled;
     document.getElementById('chkEnableDoubleCut').checked = this.settings.enableDoubleCut;
     document.getElementById('chkEnableStir').checked = this.settings.enableStir;
+    this._syncSegVal('ctrlStirMode', this.settings.stirMode);
     this._syncDirChipsUI();
 
     const pct = Math.round(this.settings.distThreshold * 100);
@@ -610,7 +678,7 @@ class NightMarketGame {
         id: this.currentDish.id,
         name: this.currentDish.name,
         prepType: 'stir',
-        imgSrc: this.settings.enableStir ? 'assets/common/wok.webp?v=2.1' : this.currentDish.finishImg,
+        imgSrc: this.settings.enableStir ? this.getCookMeta(this.currentDish).cookImg : this.currentDish.finishImg,
       },
     ];
     this.stepIndex = 0;
@@ -724,24 +792,31 @@ class NightMarketGame {
     halfLeft.src = step.imgSrc;
     halfRight.src = step.imgSrc;
 
-    // 情境 B：第 5 步且為「動作料理模式」
+    // 情境 B：第 5 步且為「動作料理模式」（視覺與語音永遠呈現該分類烹飪器具，體感判定可隨機穿插自由連揮或單次揮動）
     if (step.isFinish) {
-      if (this.settings.enableStir) {
-        this.currentTask = { type: 'STIR' };
+      const cookMeta = this.getCookMeta(this.currentDish);
+      const useCookImg = this.settings.enableStir ? cookMeta.cookImg : this.currentDish.finishImg;
+      stepImgEl.src = useCookImg;
+      halfLeft.src = useCookImg;
+      halfRight.src = useCookImg;
+
+      const shouldStir = this.settings.enableStir && (
+        this.settings.stirMode === 'always' ||
+        (this.settings.stirMode === 'random' && Math.random() < 0.35)
+      );
+
+      if (shouldStir) {
+        this.currentTask = { type: 'STIR', cookMeta };
         ruleBanner.className = 'rule-banner stir';
-        ruleBanner.textContent = `🔥 第 5 步：大火翻炒【${this.currentDish.name}】`;
+        ruleBanner.textContent = `🔥 火力全開！【${cookMeta.actionName}】自由連揮！`;
         stirMeterWrap.classList.add('active');
         document.getElementById('stirProgressFill').style.width = '0%';
-        document.getElementById('stirPercentText').textContent = '翻炒熱度 0%';
-        stepLabelEl.textContent = `🍳 翻炒出餐：${this.currentDish.name}`;
-        hintSubEl.textContent = '任意方向來回揮動翻炒，鍋子會跟著震動出餐！';
-        this.sound.speak(`自由翻炒，完成${this.currentDish.name}`);
+        document.getElementById('stirPercentText').textContent = `${cookMeta.actionName}熱度 0%`;
+        stepLabelEl.innerHTML = `<span class="step-action-badge badge-cook" style="--badge-color:${cookMeta.color}">${cookMeta.svg}<span>${cookMeta.actionName}</span></span><span class="step-item-name">${this.currentDish.name}</span>`;
+        hintSubEl.textContent = `${cookMeta.verb}，累積熱度 100% 即可香噴噴出餐！`;
+        this.sound.speak(`火力全開！${cookMeta.actionName}，完成${this.currentDish.name}`);
         return;
       }
-      // 若關閉翻炒則第 5 步使用方向揮動盛盤
-      stepImgEl.src = this.currentDish.finishImg;
-      halfLeft.src = this.currentDish.finishImg;
-      halfRight.src = this.currentDish.finishImg;
     }
 
     // 情境 C：步驟 1-4 隨機插入「壞食材抑制 (Go/No-Go)」（若開啟且本步尚未觸發過）
@@ -770,12 +845,14 @@ class NightMarketGame {
     const totalCuts = (!step.isFinish && this.settings.enableDoubleCut && Math.random() < 0.45) ? 2 : 1;
     const prepInfo = PREP_LABELS[step.prepType] || PREP_LABELS.cut;
 
+    const cookMeta = step.isFinish ? this.getCookMeta(this.currentDish) : null;
     this.currentTask = {
       type: 'DIRECTION',
       shownKey,
       requiredDirKey,
       isReverse,
-      prepType: step.isFinish ? 'flip' : (step.prepType || 'cut'),
+      prepType: step.isFinish ? 'cook' : (step.prepType || 'cut'),
+      cookMeta,
       totalCuts,
       currentCut: 1,
     };
@@ -808,16 +885,28 @@ class NightMarketGame {
       doubleCutBadge.classList.add('hidden');
     }
 
+    const cookMeta = this.currentTask.cookMeta;
+    const activeIcon = cookMeta ? cookMeta.icon : prepInfo.icon;
+    const activeTag = cookMeta ? cookMeta.actionName : prepInfo.tag;
+
     ruleBanner.className = `rule-banner ${isReverse ? 'reverse' : 'normal'}`;
     if (isReverse) {
-      ruleBanner.textContent = `🧠 反方向挑戰！往箭頭「相反方向」揮 (${prepInfo.icon}${prepInfo.tag})`;
+      ruleBanner.textContent = `🧠 反方向挑戰！往箭頭「相反方向」揮 (${activeIcon}${activeTag})`;
       hintSubEl.textContent = '看見青藍色箭頭，請往相反方向揮動！';
+    } else if (step.isFinish && cookMeta) {
+      ruleBanner.textContent = `${cookMeta.badge}｜揮一下即可出餐！`;
+      hintSubEl.textContent = `往暖金黃箭頭方向揮一下，完成「${cookMeta.actionName}」！`;
     } else {
-      ruleBanner.textContent = `🏮 照箭頭方向揮動 (${prepInfo.icon}${prepInfo.tag})`;
-      hintSubEl.textContent = `往暖金黃箭頭方向揮動，執行「${prepInfo.tag}」！`;
+      ruleBanner.textContent = `🏮 照箭頭方向揮動 (${activeIcon}${activeTag})`;
+      hintSubEl.textContent = `往暖金黃箭頭方向揮動，執行「${activeTag}」！`;
     }
 
-    stepLabelEl.textContent = step.isFinish ? `🍽️ 盛盤出餐：${this.currentDish.name}` : `${prepInfo.icon} ${step.name}`;
+    if (step.isFinish && cookMeta) {
+      stepLabelEl.innerHTML = `<span class="step-action-badge badge-cook" style="--badge-color:${cookMeta.color}">${cookMeta.svg}<span>${cookMeta.actionName}</span></span><span class="step-item-name">${this.currentDish.name}</span>`;
+    } else {
+      const pType = step.prepType || 'cut';
+      stepLabelEl.innerHTML = `<span class="step-action-badge badge-${pType}">${prepInfo.svg}<span>${prepInfo.tag}</span></span><span class="step-item-name">${step.name}</span>`;
+    }
   }
 
   _setupCognitiveChoices() {
@@ -954,7 +1043,8 @@ class NightMarketGame {
       }
     } else if (this.currentTask.type === 'STIR') {
       const pct = Math.round(res.progress * 100);
-      document.getElementById('stirPercentText').textContent = `翻炒熱度 ${pct}%`;
+      const cName = this.currentTask.cookMeta?.actionName || '烹飪';
+      document.getElementById('stirPercentText').textContent = `${cName}熱度 ${pct}%`;
       document.getElementById('stirProgressFill').style.width = `${pct}%`;
 
       // 僅在主動翻炒移動時才觸發鍋具震動與手機微震動
@@ -968,7 +1058,7 @@ class NightMarketGame {
       if (res.status === 'completed') {
         foodImgBox.classList.remove('stirring');
         this.stats.stirs++;
-        this._triggerStirFinishAnimation();
+        this._triggerStirFinishAnimation(this.currentTask.cookMeta);
       }
     }
   }
@@ -1037,6 +1127,12 @@ class NightMarketGame {
   // 四大烹飪手感動畫（切菜切半 / 撒粉淋醬 / 倒料下鍋 / 翻面夾取）
   _triggerPrepCompleteAnimation(angleRad = -0.78, isReverse = false, prepType = 'cut') {
     if (this.state !== 'PLAYING') return;
+    const curStep = this.currentSteps[this.stepIndex];
+    if (curStep?.isFinish) {
+      this._dismissGuide();
+      this._triggerStirFinishAnimation(this.currentTask?.cookMeta || this.getCookMeta(this.currentDish));
+      return;
+    }
     this._dismissGuide();
     this.state = 'ANIMATING';
 
@@ -1090,6 +1186,18 @@ class NightMarketGame {
       });
     }
 
+    if (prepType === 'pour') {
+      for (let i = 0; i < 10; i++) {
+        this.steams.push({
+          x: cx + (Math.random() - 0.5) * rect.width * 0.45,
+          y: cy + 12,
+          vx: (Math.random() - 0.5) * 1.8,
+          vy: -2.6 - Math.random() * 2.2,
+          r: 12 + Math.random() * 14,
+          life: 1.0,
+        });
+      }
+    }
     wrap.classList.add(prepMeta.anim);
 
     // 3. 飛入底部對應收集格
@@ -1152,47 +1260,57 @@ class NightMarketGame {
     }, 480);
   }
 
-  _triggerStirFinishAnimation() {
+  _triggerStirFinishAnimation(cookMeta = null) {
     if (this.state !== 'PLAYING') return;
     this.state = 'ANIMATING';
+    const meta = cookMeta || this.getCookMeta(this.currentDish);
+    const tKey = meta.typeKey || 'teppan';
+    const animClass = meta.cookAnim || 'anim-stir-done';
 
     const wrap = document.getElementById('foodHeroWrap');
     const rect = wrap.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
 
-    this.rings.push({ x: cx, y: cy, r: 28, maxR: rect.width * 1.05, life: 1.0, color: '#f97316' });
-    this.callouts.push({ x: cx, y: cy - rect.height * 0.46, text: '🔥 大火爆香出餐！', color: '#fde68a', life: 1.1 });
+    this.sound.playPrepSound(tKey === 'shake' || tKey === 'mix' ? 'sprinkle' : 'flip', false);
+    this.rings.push({ x: cx, y: cy, r: 28, maxR: rect.width * 1.08, life: 1.0, color: meta.color || '#f97316' });
+    this.callouts.push({ x: cx, y: cy - rect.height * 0.46, text: `${meta.icon} ${meta.actionName}出餐！`, color: '#fde68a', life: 1.1 });
 
-    for (let i = 0; i < 26; i++) {
+    const pColorA = meta.color || '#fbbf24';
+    const pColorB = tKey === 'shake' ? '#e0f2fe' : (tKey === 'mix' ? '#fbcfe8' : '#fef08a');
+    for (let i = 0; i < 28; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const spd = 3 + Math.random() * 8;
       this.sparks.push({
-        x: cx + (Math.random() - 0.5) * rect.width * 0.7,
-        y: cy + rect.height * 0.2,
-        vx: (Math.random() - 0.5) * 5,
-        vy: -5 - Math.random() * 8,
+        x: cx + (Math.random() - 0.5) * rect.width * 0.65,
+        y: cy + (tKey === 'fry' || tKey === 'boil' ? rect.height * 0.12 : 0),
+        vx: tKey === 'shake' ? Math.cos(a) * spd : (Math.random() - 0.5) * 5.5,
+        vy: tKey === 'shake' ? Math.sin(a) * spd : (-4.5 - Math.random() * 7.5),
         size: 3 + Math.random() * 5,
         life: 1.0,
         decay: 0.022,
-        color: i % 2 === 0 ? '#fbbf24' : '#ef4444',
+        color: i % 2 === 0 ? pColorA : pColorB,
       });
     }
-    for (let i = 0; i < 12; i++) {
-      this.steams.push({
-        x: cx + (Math.random() - 0.5) * rect.width * 0.55,
-        y: cy + (Math.random() - 0.5) * 36,
-        vx: (Math.random() - 0.5) * 1.6,
-        vy: -2.4 - Math.random() * 2.4,
-        r: 14 + Math.random() * 20,
-        life: 1.0,
-      });
+    if (tKey !== 'shake' && tKey !== 'mix') {
+      for (let i = 0; i < 12; i++) {
+        this.steams.push({
+          x: cx + (Math.random() - 0.5) * rect.width * 0.55,
+          y: cy + (Math.random() - 0.5) * 30,
+          vx: (Math.random() - 0.5) * 1.6,
+          vy: -2.4 - Math.random() * 2.4,
+          r: 14 + Math.random() * 20,
+          life: 1.0,
+        });
+      }
     }
 
-    wrap.classList.add('anim-stir-done');
+    wrap.classList.add(animClass);
     setTimeout(() => {
-      wrap.classList.remove('anim-stir-done');
+      wrap.classList.remove(animClass);
       this.stats.steps++;
       this._triggerDishComplete();
-    }, 560);
+    }, 580);
   }
 
   _triggerDishComplete() {

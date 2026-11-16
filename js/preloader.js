@@ -16,7 +16,14 @@ export class AssetManager {
    * 預載指定料理陣列（例如 [currentDish, nextDish]）
    */
   async preloadRecipes(recipes) {
-    const uniqueUrls = new Set();
+    const uniqueUrls = new Set([
+      'assets/common/cook_teppan.webp?v=2.3',
+      'assets/common/cook_fry.webp?v=2.3',
+      'assets/common/cook_grill.webp?v=2.3',
+      'assets/common/cook_boil.webp?v=2.3',
+      'assets/common/cook_shake.webp?v=2.3',
+      'assets/common/cook_mix.webp?v=2.3',
+    ]);
     for (const recipe of recipes) {
       if (!recipe) continue;
       if (recipe.finishImg) uniqueUrls.add(recipe.finishImg);

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>台灣夜市料理秀 V2.2｜體感大型機台復健遊戲</title>
   <meta name="description" content="開啟即玩！透過手部揮動完成50道台灣夜市手繪水彩美食的體感機台式復健遊戲，支援滿版鏡像鏡頭、四大烹飪手感、壞食材抑制與認知推理選菜。" />
-  <link rel="stylesheet" href="css/style.css?v=2.2" />
+  <link rel="stylesheet" href="css/style.css?v=2.3" />
   <script>
     if (!window.__ga4Loaded) {
       window.__ga4Loaded = true;
@@ -59,7 +59,7 @@
             </div>
             <div class="stage-card-body">
               <strong>🟢 大廚上工</strong>
-              <p>依金黃箭頭四方向揮動備料，最後大火翻炒出餐；專注上肢活動度與方向控制。</p>
+              <p>依金黃箭頭四方向揮動備料，最後依料理特性烹飪出餐；專注上肢活動度與方向控制。</p>
             </div>
           </button>
 
@@ -92,7 +92,7 @@
             </div>
             <div class="stage-card-body">
               <strong>🔴 總舖師挑戰</strong>
-              <p>八方向、正反兩刀連擊、壞食材抑制與大火翻炒全面啟動；適合全方位進階挑戰。</p>
+              <p>八方向、正反兩刀連擊、壞食材抑制與烹飪出餐全面啟動；適合全方位進階挑戰。</p>
             </div>
           </button>
         </div>
@@ -174,8 +174,13 @@
               <div class="checkbox-row" style="margin-top: 10px;">
                 <label class="toggle-label" id="rowEnableStir">
                   <input type="checkbox" id="chkEnableStir" checked />
-                  <span><strong>🔥 大火自由翻炒出餐</strong><br><small class="chk-desc">第 5 步來回揮動累積熱度</small></span>
+                  <span><strong>🍳 依料理分類烹飪出餐</strong><br><small class="chk-desc">依料理切換煎炒、酥炸甩油、炭烤、滾煮或手搖搖勻</small></span>
                 </label>
+              </div>
+              <div class="seg-control sub-seg" id="ctrlStirMode" style="margin-bottom: 6px;">
+                <button data-val="random" class="active">🎲 隨機驚喜連揮</button>
+                <button data-val="always">🔥 每道第5步連揮</button>
+                <button data-val="off">☝️ 全程單次揮</button>
               </div>
               <div class="seg-control sub-seg" id="ctrlStirMult">
                 <button data-val="3">翻炒 3 倍</button>
@@ -305,7 +310,7 @@
 
         <!-- 新手即時引導條（讓玩家一打開就看懂怎麼玩，第一次揮動後自動淡出或可手動關閉） -->
         <div id="quickGuideBar" class="quick-guide-bar">
-          <span>👋 <strong>怎麼玩：</strong>用手指或滑鼠往箭頭方向揮動備料！想用體感可點右上角 <strong>📷 開鏡頭</strong>，調整玩法點 <strong>⚙️ 設定</strong></span>
+          <span>👋 <strong>怎麼玩：</strong>往箭頭方向揮動！體感點右上 <strong>📷</strong>，設定點 <strong>⚙️</strong></span>
           <button id="btnDismissGuide" class="guide-close-btn" aria-label="關閉說明">✕</button>
         </div>
 
@@ -493,6 +498,6 @@
       });
     })();
   </script>
-  <script type="module" src="js/game.js?v=2.2"></script>
+  <script type="module" src="js/game.js?v=2.3"></script>
 </body>
 </html>

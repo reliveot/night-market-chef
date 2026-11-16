@@ -1076,11 +1076,13 @@ input[type="range"] {
 }
 
 .bottom-hud {
-  position: absolute;
-  bottom: max(10px, env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(94vw, 620px);
+  position: relative;
+  bottom: auto;
+  left: auto;
+  transform: none;
+  flex: 0 0 auto;
+  margin: 0 auto max(8px, env(safe-area-inset-bottom));
+  width: min(94vw, 640px);
   z-index: 30;
 }
 
@@ -1944,4 +1946,87 @@ input[type="range"] {
   .stage-thumb-wrap {
     height: 142px !important;
   }
+}
+
+/* === V2.5 開局模式選擇彈窗 & 圓形環繞進度條 === */
+.welcome-modal-box {
+  max-width: 440px;
+  text-align: center;
+  padding: 24px 22px;
+}
+.welcome-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.16);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  color: #fde68a;
+  font-size: 0.82rem;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+.welcome-modal-box h2 {
+  margin: 0 0 8px;
+  font-size: 1.38rem;
+  color: #fffbeb;
+}
+.welcome-how-to {
+  margin: 0 0 18px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(254, 243, 199, 0.16);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #fef3c7;
+}
+.welcome-btn-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.welcome-choice-btn {
+  display: flex !important;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  padding: 13px 16px !important;
+  border-radius: 16px !important;
+}
+.welcome-touch-btn {
+  background: linear-gradient(135deg, #0ea5e9, #0284c7) !important;
+  box-shadow: 0 6px 18px rgba(14, 165, 233, 0.32) !important;
+}
+.wc-icon {
+  font-size: 1.75rem;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.wc-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wc-text strong {
+  font-size: 1.05rem;
+  color: #ffffff;
+}
+.wc-text small {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.88);
+}
+.welcome-settings-btn {
+  margin-top: 4px;
+  width: 100%;
+  padding: 11px 14px !important;
+  font-size: 0.92rem !important;
+}
+.stir-ring-svg {
+  filter: drop-shadow(0 0 10px rgba(251, 146, 60, 0.75));
+}
+.stir-center-text {
+  border-color: #fbbf24 !important;
+  color: #fef08a !important;
+  box-shadow: 0 4px 16px rgba(249, 115, 22, 0.45);
 }

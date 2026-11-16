@@ -327,11 +327,6 @@
           </div>
         </header>
 
-        <!-- 新手即時引導條（讓玩家一打開就看懂怎麼玩，第一次揮動後自動淡出或可手動關閉） -->
-        <div id="quickGuideBar" class="quick-guide-bar">
-          <span>👋 <strong>怎麼玩：</strong>往箭頭方向揮動！體感點右上 <strong>📷</strong>，設定點 <strong>⚙️</strong></span>
-          <button id="btnDismissGuide" class="guide-close-btn" aria-label="關閉說明">✕</button>
-        </div>
 
         <div id="centerArena" class="center-arena">
           <div id="ruleBanner" class="rule-banner normal">🏮 照箭頭方向揮動</div>
@@ -383,13 +378,20 @@
                 stroke-linecap="round" stroke-dasharray="339.29" stroke-dashoffset="339.29" />
             </svg>
             <div id="spoiledTimerText" class="hold-center-text">✋ 忍住不動 2.5s</div>
-          </div>
 
-          <div id="stirMeterWrap" class="stir-meter-wrap">
-            <div class="stir-bar-bg">
-              <div id="stirProgressFill" class="stir-bar-fill"></div>
-            </div>
-            <span id="stirPercentText" class="stir-pct-text">翻炒熱度 0%</span>
+            <svg id="stirRingSvg" class="hold-ring-svg stir-ring-svg" viewBox="0 0 120 120">
+              <defs>
+                <linearGradient id="gradStirRing" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#fde047" />
+                  <stop offset="50%" stop-color="#f97316" />
+                  <stop offset="100%" stop-color="#ef4444" />
+                </linearGradient>
+              </defs>
+              <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(251,191,36,0.2)" stroke-width="6.5" />
+              <circle id="stirRingProg" cx="60" cy="60" r="54" fill="none" stroke="url(#gradStirRing)" stroke-width="6.5"
+                stroke-linecap="round" stroke-dasharray="339.29" stroke-dashoffset="339.29" />
+            </svg>
+            <div id="stirPercentText" class="hold-center-text stir-center-text">🔥 熱度 0%</div>
           </div>
 
           <div id="currentStepLabel" class="food-caption">🦪 蚵仔</div>
@@ -447,6 +449,27 @@
       </div>
     </section>
   </main>
+
+  <div id="modalWelcome" class="modal">
+    <div class="modal-box welcome-modal-box">
+      <div class="welcome-badge">🏮 台灣夜市料理秀 V2.5</div>
+      <h2>選擇遊玩方式開始出餐！</h2>
+      <p class="welcome-how-to">👋 <strong>怎麼玩：</strong>照箭頭方向揮動手部完成備料，第 5 步完成料理出餐！</p>
+      <div class="welcome-btn-stack">
+        <button id="btnWelcomeCamera" class="btn-primary btn-xl welcome-choice-btn">
+          <span class="wc-icon">📷</span>
+          <span class="wc-text"><strong>鏡頭體感開玩</strong><small>揮動雙手或身體，全螢幕互動體驗</small></span>
+        </button>
+        <button id="btnWelcomeTouch" class="btn-primary btn-xl welcome-choice-btn welcome-touch-btn">
+          <span class="wc-icon">👆</span>
+          <span class="wc-text"><strong>觸控／滑鼠開玩</strong><small>直接滑動螢幕，隨時隨地輕鬆練習</small></span>
+        </button>
+        <button id="btnWelcomeSettings" class="btn-outline btn-lg welcome-settings-btn">
+          ⚙️ 先設定關卡與更多細節
+        </button>
+      </div>
+    </div>
+  </div>
 
   <div id="modalCalibrate" class="modal hidden">
     <div class="modal-box">

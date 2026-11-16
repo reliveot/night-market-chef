@@ -601,6 +601,31 @@ class NightMarketGame {
     });
     document.getElementById('btnStartCustom').addEventListener('click', () => this.startGame());
 
+    const welcomeModal = document.getElementById('modalWelcome');
+    document.getElementById('btnWelcomeCamera')?.addEventListener('click', () => {
+      this.settings.inputMode = 'camera';
+      document.querySelectorAll('#segInputMode button').forEach((b) => {
+        b.classList.toggle('active', b.dataset.val === 'camera');
+      });
+      document.getElementById('rowMirror')?.classList.toggle('hidden', false);
+      welcomeModal?.classList.add('hidden');
+      this.startGame();
+    });
+    document.getElementById('btnWelcomeTouch')?.addEventListener('click', () => {
+      this.settings.inputMode = 'touch';
+      document.querySelectorAll('#segInputMode button').forEach((b) => {
+        b.classList.toggle('active', b.dataset.val === 'touch');
+      });
+      document.getElementById('rowMirror')?.classList.toggle('hidden', true);
+      welcomeModal?.classList.add('hidden');
+      this.startGame();
+    });
+    document.getElementById('btnWelcomeSettings')?.addEventListener('click', () => {
+      this.sound.unlock();
+      welcomeModal?.classList.add('hidden');
+      this.quitToMenu();
+    });
+
     // HUD 音效與結束／打烊結算按鈕
     document.getElementById('btnHudSound').addEventListener('click', () => {
       this.settings.sound = !this.settings.sound;
@@ -1028,7 +1053,8 @@ class NightMarketGame {
     const spoiledRingSvg = document.getElementById('spoiledRingSvg');
     const spoiledTimerText = document.getElementById('spoiledTimerText');
     const doubleCutBadge = document.getElementById('doubleCutBadge');
-    const stirMeterWrap = document.getElementById('stirMeterWrap');
+    const stirRingSvg = document.getElementById('stirRingSvg');
+    const stirPercentText = document.getElementById('stirPercentText');
     const cogChoiceArena = document.getElementById('cogChoiceArena');
 
     foodHeroWrap.className = 'food-hero-wrap';
@@ -1037,7 +1063,8 @@ class NightMarketGame {
     spoiledRingSvg.classList.remove('active');
     spoiledTimerText.classList.remove('active');
     doubleCutBadge.classList.add('hidden');
-    stirMeterWrap.classList.remove('active');
+    stirRingSvg?.classList.remove('active');
+    stirPercentText?.classList.remove('active');
     cogChoiceArena.classList.add('hidden');
     arrowOverlay.style.display = 'none';
 
@@ -1079,9 +1106,11 @@ class NightMarketGame {
         this.currentTask = { type: 'STIR', cookMeta };
         ruleBanner.className = 'rule-banner stir';
         ruleBanner.textContent = `🔥 火力全開！【${cookMeta.actionName}】自由連揮！`;
-        stirMeterWrap.classList.add('active');
-        document.getElementById('stirProgressFill').style.width = '0%';
-        document.getElementById('stirPercentText').textContent = `${cookMeta.actionName}熱度 0%`;
+        stirRingSvg?.classList.add('active');
+        stirPercentText?.classList.add('active');
+        const stirProg = document.getElementById('stirRingProg');
+        if (stirProg) stirProg.style.strokeDashoffset = '339.29';
+        if (stirPercentText) stirPercentText.textContent = `🔥 ${cookMeta.actionName} 0%`;
         stepLabelEl.innerHTML = `<span class="step-action-badge badge-cook" style="--badge-color:${cookMeta.color}">${cookMeta.svg}<span>${cookMeta.actionName}</span></span><span class="step-item-name">${this.currentDish.name}</span>`;
         hintSubEl.textContent = `${cookMeta.verb}，累積熱度 100% 即可香噴噴出餐！`;
         this.sound.speak(`火力全開！${cookMeta.actionName}，完成${this.currentDish.name}`);
@@ -1320,8 +1349,10 @@ class NightMarketGame {
     } else if (this.currentTask.type === 'STIR') {
       const pct = Math.round(res.progress * 100);
       const cName = this.currentTask.cookMeta?.actionName || '烹飪';
-      document.getElementById('stirPercentText').textContent = `${cName}熱度 ${pct}%`;
-      document.getElementById('stirProgressFill').style.width = `${pct}%`;
+      const stirTxt = document.getElementById('stirPercentText');
+      if (stirTxt) stirTxt.textContent = `🔥 ${cName} ${pct}%`;
+      const stirProg = document.getElementById('stirRingProg');
+      if (stirProg) stirProg.style.strokeDashoffset = (339.29 * (1 - pct / 100)).toFixed(2);
 
       // 僅在主動翻炒移動時才觸發鍋具震動與手機微震動
       const foodImgBox = document.getElementById('foodImgBox');
@@ -2009,6 +2040,5 @@ class NightMarketGame {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  const game = new NightMarketGame();
-  game.startGame();
+  window.__nightMarketGame = new NightMarketGame();
 });

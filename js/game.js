@@ -1035,6 +1035,7 @@ class NightMarketGame {
     arrowSvg.classList.toggle('normal', !cut1.isReverse);
     arrowSvg.classList.toggle('reverse', cut1.isReverse);
     arrowPath.setAttribute('fill', cut1.isReverse ? 'url(#gradCyan)' : 'url(#gradGold)');
+    arrowPath.setAttribute('stroke', cut1.isReverse ? '#0F3E5C' : '#5C3317');
     foodHalo.classList.toggle('reverse', cuts.some((c) => c.isReverse));
 
     const arrowOverlay2 = document.getElementById('arrowOverlay2');
@@ -1049,6 +1050,7 @@ class NightMarketGame {
         arrowSvg2.classList.toggle('normal', !cut2.isReverse);
         arrowSvg2.classList.toggle('reverse', cut2.isReverse);
         arrowPath2.setAttribute('fill', cut2.isReverse ? 'url(#gradCyan)' : 'url(#gradGold)');
+        arrowPath2.setAttribute('stroke', cut2.isReverse ? '#0F3E5C' : '#5C3317');
         doubleCutBadge.textContent = '⚔️ 雙刀連擊（順序不限）';
       } else {
         if (arrowOverlay2) arrowOverlay2.style.display = 'none';

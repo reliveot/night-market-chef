@@ -2170,11 +2170,7 @@ input[type="range"] {
   margin-top: 6px;
 }
 
-/* === V2.6 雙刀連擊：等大並排雙箭頭（無先後順序） === */
-.food-img-box.has-dual-arrows .arrow-overlay:not(.arrow-overlay-second) {
-  transform: translateX(-28%) !important;
-}
+/* === V2.6 雙刀連擊：兩支等大水彩箭頭同時置中（無先後順序） === */
 .arrow-overlay-second {
-  transform: translateX(28%);
   pointer-events: none;
 }

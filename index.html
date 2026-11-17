@@ -154,7 +154,7 @@
       </div>
 
       <!-- ③ 細部微調（自動隨上方關卡同步，若有手動修改則顯示自訂提示） -->
-      <details class="card adv-settings-drawer" open>
+      <details class="card adv-settings-drawer">
         <summary class="adv-summary">
           <span>🎛️ ③ 細部微調（已依上方關卡自動帶入，可自由調整）</span>
           <span class="adv-hint">展開／收合</span>
@@ -446,29 +446,47 @@
       </div>
     </section>
 
-    <!-- 3. 結算畫面 -->
+    <!-- 3. 結算畫面（三層視覺層級：重點大數字 → 主要按鈕 → 次要出餐與治療師明細） -->
     <section id="screenResult" class="screen">
       <div class="card result-card">
         <h1 id="resMainTitle">🏆 本局夜市擺攤完成！</h1>
         <p id="resStallRankBanner" class="stall-rank-banner hidden"></p>
-        <div class="stats-grid">
-          <div class="stat-box"><span>完成料理</span><strong id="resDishes">0 道</strong></div>
-          <div class="stat-box"><span>完成步驟</span><strong id="resSteps">0 步</strong></div>
-          <div class="stat-box"><span>方向揮動成功</span><strong id="resSwipes">0 次</strong></div>
-          <div class="stat-box"><span>壞食材成功忍住</span><strong id="resHolds">0 次</strong></div>
-          <div class="stat-box"><span>翻炒／選菜出餐</span><strong id="resStirs">0 次</strong></div>
-          <div class="stat-box"><span>實際練習時間</span><strong id="resTime">0 秒</strong></div>
+
+        <!-- Tier 1: 重點大數字（只留 2 個核心指標） -->
+        <div class="res-hero-grid">
+          <div class="res-hero-box">
+            <span>完成料理</span>
+            <strong id="resDishes">0 道</strong>
+          </div>
+          <div class="res-hero-box">
+            <span>有效練習時間</span>
+            <strong id="resTime">0 秒</strong>
+          </div>
+        </div>
+
+        <!-- Tier 2: 操作按鈕立即出現（免往下滑） -->
+        <div class="result-actions res-primary-actions">
+          <button id="btnPlayAgain" class="btn-primary btn-lg">🔄 再玩一局</button>
+          <button id="btnBackSettings" class="btn-outline btn-lg">⚙️ 調整設定</button>
         </div>
 
         <div id="resIncompleteBox" class="incomplete-note hidden"></div>
 
-        <h3>🍽️ 本局出餐成品</h3>
-        <div id="resDishGrid" class="result-dish-grid"></div>
+        <!-- Tier 3: 次要明細與治療師觀察數據（收合／小字層級） -->
+        <details class="res-details-drawer">
+          <summary class="res-details-summary">📊 查看詳細數據與治療師紀錄（步驟・方向・追蹤穩定度）</summary>
+          <div class="res-sub-stats">
+            <div class="res-sub-item"><span>完成步驟</span><strong id="resSteps">0 步</strong></div>
+            <div class="res-sub-item"><span>方向揮動</span><strong id="resSwipes">0 次</strong></div>
+            <div class="res-sub-item"><span>壞食材忍住</span><strong id="resHolds">0 次</strong></div>
+            <div class="res-sub-item"><span>翻炒／選菜</span><strong id="resStirs">0 次</strong></div>
+            <div class="res-sub-item"><span>追蹤中斷</span><strong id="resDrops">0 次</strong></div>
+          </div>
+          <div id="resDirBreakdown" class="res-dir-breakdown"></div>
+        </details>
 
-        <div class="result-actions">
-          <button id="btnPlayAgain" class="btn-primary btn-lg">🔄 再玩一局</button>
-          <button id="btnBackSettings" class="btn-outline btn-lg">⚙️ 調整設定</button>
-        </div>
+        <h3 class="res-dishes-heading">🍽️ 本局出餐成品</h3>
+        <div id="resDishGrid" class="result-dish-grid"></div>
       </div>
     </section>
   </main>

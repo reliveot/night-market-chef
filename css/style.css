@@ -2063,3 +2063,94 @@ input[type="range"] {
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* === V2.6 結算頁三層視覺層級（重點大數字 → 立即操作按鈕 → 次要治療師明細） === */
+.res-hero-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin: 12px 0 14px;
+}
+.res-hero-box {
+  padding: 16px 12px;
+  border-radius: 18px;
+  background: linear-gradient(155deg, rgba(245, 158, 11, 0.2), rgba(120, 53, 15, 0.28));
+  border: 2px solid rgba(251, 191, 36, 0.48);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.res-hero-box span {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fde68a;
+}
+.res-hero-box strong {
+  font-size: clamp(28px, 6.5vw, 38px);
+  line-height: 1.1;
+  font-weight: 900;
+  color: #fffbeb;
+}
+.res-primary-actions {
+  margin: 0 0 16px !important;
+}
+.res-details-drawer {
+  margin: 10px 0 16px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  text-align: left;
+}
+.res-details-summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: #cbd5e1;
+  list-style: none;
+}
+.res-details-summary::-webkit-details-marker { display: none; }
+.res-sub-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.res-sub-item {
+  padding: 8px 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.res-sub-item span {
+  font-size: 11px;
+  color: #94a3b8;
+}
+.res-sub-item strong {
+  font-size: 15px;
+  font-weight: 800;
+  color: #f1f5f9;
+}
+.res-dir-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.res-dir-chip {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #e0f2fe;
+}
+.res-dishes-heading {
+  font-size: 15px;
+  margin-top: 6px;
+}

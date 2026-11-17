@@ -107,6 +107,9 @@ class NightMarketGame {
         onTrackingState: (detected) => {
           const btn = document.getElementById('btnHudCam');
           if (!btn) return;
+          if (!detected && this.state === 'PLAYING' && this.stats) {
+            this.stats.drops++;
+          }
           if (this.settings.inputMode === 'camera') {
             btn.textContent = detected ? '🖐️ 追蹤中' : '👀 尋手中';
           } else if (this.settings.inputMode === 'color') {
@@ -138,7 +141,7 @@ class NightMarketGame {
   }
 
   _emptyStats() {
-    return { dishes: 0, steps: 0, swipes: 0, holds: 0, stirs: 0, coins: 0, completedList: [] };
+    return { dishes: 0, steps: 0, swipes: 0, holds: 0, stirs: 0, coins: 0, drops: 0, activeMs: 0, dirCounts: {}, completedList: [] };
   }
 
   _loadCollection() {
@@ -1166,6 +1169,10 @@ class NightMarketGame {
     if (this.currentTask.type === 'DIRECTION') {
       if (res.status === 'completed') {
         this.stats.swipes++;
+        if (this.currentTask?.requiredDirKey) {
+          const dk = this.currentTask.requiredDirKey;
+          this.stats.dirCounts[dk] = (this.stats.dirCounts[dk] || 0) + 1;
+        }
         // 若為兩刀連擊的第一刀
         if (this.currentTask.currentCut < this.currentTask.totalCuts) {
           this._playFirstCutFX(res.swipeAngleRad, this.currentTask.isReverse);
@@ -1566,15 +1573,28 @@ class NightMarketGame {
     clearInterval(this.timerInterval);
     this.tracker.stop();
 
-    const activeMs = Math.max(0, performance.now() - this.startTimeMs);
-    const totalSec = Math.round(activeMs / 1000);
+    const activeSec = Math.round((this.stats.activeMs || 0) / 1000);
 
     document.getElementById('resDishes').textContent = `${this.stats.dishes} 道`;
     document.getElementById('resSteps').textContent = `${this.stats.steps} 步`;
     document.getElementById('resSwipes').textContent = `${this.stats.swipes} 次`;
     document.getElementById('resHolds').textContent = `${this.stats.holds} 次`;
     document.getElementById('resStirs').textContent = `${this.stats.stirs} 次`;
-    document.getElementById('resTime').textContent = `${totalSec} 秒`;
+    document.getElementById('resTime').textContent = `${activeSec} 秒`;
+
+    const dropsEl = document.getElementById('resDrops');
+    if (dropsEl) dropsEl.textContent = `${this.stats.drops || 0} 次`;
+
+    const dirEl = document.getElementById('resDirBreakdown');
+    if (dirEl) {
+      const entries = Object.entries(this.stats.dirCounts || {});
+      dirEl.innerHTML = entries.length > 0
+        ? entries.map(([k, cnt]) => {
+            const g = DIR_VECTORS[k]?.glyph || k;
+            return `<span class="res-dir-chip">${g} ${cnt} 次</span>`;
+          }).join('')
+        : '<span class="res-dir-chip">本局無方向揮動紀錄</span>';
+    }
 
     const rankBanner = document.getElementById('resStallRankBanner');
     if (this.settings.gameMode === 'endless') {
@@ -1660,6 +1680,9 @@ class NightMarketGame {
       const dt = Math.min(0.05, (ts - lastTs) / 1000);
       lastTs = ts;
 
+      if (this.state === 'PLAYING' && this.stats) {
+        this.stats.activeMs += dt * 1000;
+      }
       if (this.state === 'PLAYING' || this.state === 'ANIMATING' || this.state === 'CELEBRATING' || this.state === 'CALIBRATING_COLOR') {
         this._renderSimBackground(ts);
         this._renderFXCanvas(dt);

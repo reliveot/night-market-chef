@@ -105,12 +105,12 @@
       <!-- ② 過關方式與攤位分類（與關卡獨立，互不衝突） -->
       <div class="card">
         <div class="section-head">
-          <h2>② 過關方式與攤位分類</h2>
-          <span class="section-sub">設定這一局要玩幾道菜、限時幾秒，以及想逛哪一區夜市攤位</span>
+          <h2>② 遊戲與操控設定</h2>
+          <span class="section-sub">設定操控方式、過關目標與想逛的夜市攤位</span>
         </div>
         <div class="settings-grid">
           <div class="setting-group">
-            <label>操作方式（感應／觸控）</label>
+            <label>操控方式（感應／觸控）</label>
             <div class="seg-control" id="ctrlInputMode">
               <button data-val="touch" class="active">👆 觸控滑動</button>
               <button data-val="camera">🖐️ 手部偵測</button>
@@ -124,7 +124,7 @@
           </div>
 
           <div class="setting-group">
-            <label>過關方式</label>
+            <label>過關目標</label>
             <div class="seg-control" id="ctrlGameMode">
               <button data-val="dishes" class="active">🍽️ 指定道數</button>
               <button data-val="timed">⏱️ 限時倒數</button>
@@ -154,7 +154,7 @@
           </div>
 
           <div class="setting-group">
-            <label>夜市攤位主題</label>
+            <label>夜市攤位</label>
             <div class="seg-control seg-wrap" id="ctrlCategoryFilter">
               <button data-val="ALL" class="active">全部 (50)</button>
               <button data-val="煎台料理">煎台</button>
@@ -170,7 +170,7 @@
       <!-- ③ 細部微調（自動隨上方關卡同步，若有手動修改則顯示自訂提示） -->
       <details class="card adv-settings-drawer">
         <summary class="adv-summary">
-          <span>🎛️ ③ 細部微調（已依上方關卡自動帶入，可自由調整）</span>
+          <span>🎛️ ③ 進階細部微調（已依上方關卡自動帶入，可自由調整）</span>
           <span class="adv-hint">展開／收合</span>
         </summary>
         <div class="adv-inner">
@@ -376,7 +376,7 @@
             </div>
 
             <div id="arrowOverlay2" class="arrow-overlay arrow-overlay-second" style="display:none;">
-              <svg id="arrowSvg2" class="arrow-svg normal" viewBox="0 0 120 120">
+              <svg id="arrowSvg2" class="arrow-3d-svg normal" viewBox="0 0 120 120">
                 <path id="arrowPath2"
                   d="M20 56.5 L86 56.5 L78 46.5 L82 43 L108 60 L82 77 L78 73.5 L86 63.5 L20 63.5 Z"
                   fill="url(#gradGold)"

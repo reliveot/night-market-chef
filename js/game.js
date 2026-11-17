@@ -896,6 +896,8 @@ class NightMarketGame {
     stirPercentText?.classList.remove('active');
     cogChoiceArena.classList.add('hidden');
     arrowOverlay.style.display = 'none';
+    const arrowOverlay2 = document.getElementById('arrowOverlay2');
+    if (arrowOverlay2) arrowOverlay2.style.display = 'none';
 
     // 情境 A：第 5 步且為「認知推理選菜模式」
     if (step.isFinish && this.settings.trainingMode === 'cognitive') {
@@ -903,9 +905,10 @@ class NightMarketGame {
       stepLabelEl.classList.add('hidden');
       cogChoiceArena.classList.remove('hidden');
 
+      this.cogReadyAtMs = performance.now() + 1500;
       ruleBanner.className = 'rule-banner reverse';
       ruleBanner.textContent = '🧠 猜猜看！這 4 樣材料是哪道夜市美食？';
-      hintSubEl.textContent = '把手移到「左／上／右」任一區停留 2 秒作答（或直接點選）';
+      hintSubEl.textContent = '⏳ 先看題目想一下（1.5 秒後開始感應作答）…';
       this.sound.speak('看看底下的四樣材料，猜猜看是哪一道料理？');
       this._setupCognitiveChoices();
       return;
@@ -971,6 +974,19 @@ class NightMarketGame {
     const requiredDirKey = isReverse ? DIR_VECTORS[shownKey].opposite : shownKey;
 
     const totalCuts = (!step.isFinish && this.settings.enableDoubleCut && Math.random() < 0.45) ? 2 : 1;
+    const remainingCuts = [{ shownKey, isReverse, requiredDirKey }];
+    if (totalCuts === 2) {
+      let shown2 = this._pickRandomDirection(shownKey);
+      let rev2 = this.settings.dirRule === 'mixed'
+        ? Math.random() < 0.5
+        : this.settings.dirRule === 'reverse';
+      let req2 = rev2 ? DIR_VECTORS[shown2].opposite : shown2;
+      if (req2 === requiredDirKey) {
+        shown2 = this._pickRandomDirection(shown2);
+        req2 = rev2 ? DIR_VECTORS[shown2].opposite : shown2;
+      }
+      remainingCuts.push({ shownKey: shown2, isReverse: rev2, requiredDirKey: req2 });
+    }
     const prepInfo = PREP_LABELS[step.prepType] || PREP_LABELS.cut;
 
     const cookMeta = step.isFinish ? this.getCookMeta(this.currentDish) : null;
@@ -979,6 +995,7 @@ class NightMarketGame {
       shownKey,
       requiredDirKey,
       isReverse,
+      remainingCuts,
       prepType: step.isFinish ? 'cook' : (step.prepType || 'cut'),
       cookMeta,
       totalCuts,
@@ -989,7 +1006,18 @@ class NightMarketGame {
   }
 
   _renderDirectionUI(step, prepInfo) {
-    const { shownKey, isReverse, totalCuts, currentCut } = this.currentTask;
+    const cuts = this.currentTask.remainingCuts || [{
+      shownKey: this.currentTask.shownKey,
+      isReverse: this.currentTask.isReverse,
+      requiredDirKey: this.currentTask.requiredDirKey,
+    }];
+    const cut1 = cuts[0];
+    const cut2 = cuts[1] || null;
+    const { totalCuts, currentCut } = this.currentTask;
+    const shownKey = cut1.shownKey;
+    const isReverse = cut1.isReverse;
+
+    const foodImgBox = document.getElementById('foodImgBox');
     const arrowOverlay = document.getElementById('arrowOverlay');
     const arrowSvg = document.getElementById('arrowSvg');
     const arrowPath = document.getElementById('arrowPath');
@@ -999,17 +1027,35 @@ class NightMarketGame {
     const stepLabelEl = document.getElementById('currentStepLabel');
     const hintSubEl = document.getElementById('promptTargetText');
 
+    foodImgBox?.classList.toggle('has-dual-arrows', cuts.length === 2);
+
     arrowOverlay.style.display = 'grid';
-    arrowOverlay.style.transform = `rotate(${DIR_VECTORS[shownKey].deg}deg)`;
-    arrowSvg.classList.toggle('normal', !isReverse);
-    arrowSvg.classList.toggle('reverse', isReverse);
-    arrowPath.setAttribute('fill', isReverse ? 'url(#gradCyan)' : 'url(#gradGold)');
-    foodHalo.classList.toggle('reverse', isReverse);
+    arrowSvg.style.transform = `rotate(${DIR_VECTORS[cut1.shownKey].deg}deg)`;
+    arrowOverlay.style.transform = '';
+    arrowSvg.classList.toggle('normal', !cut1.isReverse);
+    arrowSvg.classList.toggle('reverse', cut1.isReverse);
+    arrowPath.setAttribute('fill', cut1.isReverse ? 'url(#gradCyan)' : 'url(#gradGold)');
+    foodHalo.classList.toggle('reverse', cuts.some((c) => c.isReverse));
+
+    const arrowOverlay2 = document.getElementById('arrowOverlay2');
+    const arrowSvg2 = document.getElementById('arrowSvg2');
+    const arrowPath2 = document.getElementById('arrowPath2');
 
     if (totalCuts > 1) {
       doubleCutBadge.classList.remove('hidden');
-      doubleCutBadge.textContent = `⚔️ 第 ${currentCut} / ${totalCuts} 刀`;
+      if (cut2 && arrowOverlay2 && arrowSvg2 && arrowPath2) {
+        arrowOverlay2.style.display = 'grid';
+        arrowSvg2.style.transform = `rotate(${DIR_VECTORS[cut2.shownKey].deg}deg)`;
+        arrowSvg2.classList.toggle('normal', !cut2.isReverse);
+        arrowSvg2.classList.toggle('reverse', cut2.isReverse);
+        arrowPath2.setAttribute('fill', cut2.isReverse ? 'url(#gradCyan)' : 'url(#gradGold)');
+        doubleCutBadge.textContent = '⚔️ 雙刀連擊（順序不限）';
+      } else {
+        if (arrowOverlay2) arrowOverlay2.style.display = 'none';
+        doubleCutBadge.textContent = '⚔️ 還剩最後 1 刀';
+      }
     } else {
+      if (arrowOverlay2) arrowOverlay2.style.display = 'none';
       doubleCutBadge.classList.add('hidden');
     }
 
@@ -1169,24 +1215,26 @@ class NightMarketGame {
 
     if (this.currentTask.type === 'DIRECTION') {
       if (res.status === 'completed') {
+        const cuts = this.currentTask.remainingCuts || [];
+        const matchedIdx = typeof res.matchedIndex === 'number' ? res.matchedIndex : 0;
+        const matchedCut = cuts[matchedIdx] || this.currentTask;
+
         this.stats.swipes++;
-        if (this.currentTask?.requiredDirKey) {
-          const dk = this.currentTask.requiredDirKey;
+        if (matchedCut?.requiredDirKey) {
+          const dk = matchedCut.requiredDirKey;
           this.stats.dirCounts[dk] = (this.stats.dirCounts[dk] || 0) + 1;
         }
-        // 若為兩刀連擊的第一刀
-        if (this.currentTask.currentCut < this.currentTask.totalCuts) {
-          this._playFirstCutFX(res.swipeAngleRad, this.currentTask.isReverse);
+        if (cuts.length > 1) {
+          this._playFirstCutFX(res.swipeAngleRad, matchedCut.isReverse);
+          cuts.splice(matchedIdx, 1);
           this.currentTask.currentCut++;
-          const nextShown = this._pickRandomDirection(this.currentTask.shownKey);
-          const nextRev = this.settings.dirRule === 'normal' ? false : !this.currentTask.isReverse;
-          this.currentTask.shownKey = nextShown;
-          this.currentTask.isReverse = nextRev;
-          this.currentTask.requiredDirKey = nextRev ? DIR_VECTORS[nextShown].opposite : nextShown;
+          this.currentTask.shownKey = cuts[0].shownKey;
+          this.currentTask.isReverse = cuts[0].isReverse;
+          this.currentTask.requiredDirKey = cuts[0].requiredDirKey;
           const step = this.currentSteps[this.stepIndex];
           this._renderDirectionUI(step, PREP_LABELS[step.prepType] || PREP_LABELS.cut);
         } else {
-          this._triggerPrepCompleteAnimation(res.swipeAngleRad, this.currentTask.isReverse, this.currentTask.prepType);
+          this._triggerPrepCompleteAnimation(res.swipeAngleRad, matchedCut.isReverse, this.currentTask.prepType);
         }
       }
     } else if (this.currentTask.type === 'SPOILED') {
@@ -1273,6 +1321,15 @@ class NightMarketGame {
       if (matched) hitId = matched.dataset.dishId;
     }
 
+    if (this.cogReadyAtMs && performance.now() < this.cogReadyAtMs) {
+      this.cogHoveredId = null;
+      this.cogHoverElapsedMs = 0;
+      return;
+    }
+    const hintSubEl = document.getElementById('promptTargetText');
+    if (hintSubEl && hintSubEl.textContent.includes('想一下')) {
+      hintSubEl.textContent = '把手移到任一分區停留 2 秒作答（或直接點選）';
+    }
     const DWELL_MS = 2000;
     if (hitId && hitId === this.cogHoveredId) {
       this.cogHoverElapsedMs += dt;

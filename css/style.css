@@ -2169,3 +2169,12 @@ input[type="range"] {
   font-size: 15px;
   margin-top: 6px;
 }
+
+/* === V2.6 雙刀連擊：等大並排雙箭頭（無先後順序） === */
+.food-img-box.has-dual-arrows .arrow-overlay:not(.arrow-overlay-second) {
+  transform: translateX(-28%) !important;
+}
+.arrow-overlay-second {
+  transform: translateX(28%);
+  pointer-events: none;
+}

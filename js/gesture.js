@@ -138,44 +138,52 @@ export class GestureJudge {
     return { status: 'idle', x, y, progress: 0, isMoving: false };
   }
 
-  _evalDirection(x, y, nowMs, dirKey) {
+  _evalDirection(x, y, nowMs, dirKeys) {
     if (!this.anchor) this.anchor = { x, y };
-    const target = DIR_VECTORS[dirKey];
+    const keys = Array.isArray(dirKeys) ? dirKeys : [dirKeys];
     const vx = x - this.anchor.x;
     const vy = y - this.anchor.y;
     const dist = Math.hypot(vx, vy);
-    const proj = vx * target.dx + vy * target.dy;
+    const effectiveTol = Math.max(this.angleToleranceDeg, 52);
 
-    // 明顯往反方向回拉時，才把起點更新到折返點（方便玩家直接從新位置繼續揮）
-    if (proj < -0.045) {
-      this.anchor = { x, y };
-      return { status: 'tracking', x, y, progress: 0 };
-    }
+    let bestProgress = 0;
+    let allRetreating = true;
 
-    const progress = Math.min(1, Math.max(0, proj / this.distThreshold));
+    for (let i = 0; i < keys.length; i++) {
+      const target = DIR_VECTORS[keys[i]];
+      if (!target) continue;
+      const proj = vx * target.dx + vy * target.dy;
+      if (proj >= -0.045) allRetreating = false;
+      const prog = Math.min(1, Math.max(0, proj / this.distThreshold));
+      if (prog > bestProgress) bestProgress = prog;
 
-    // 以「目標方向有效推進距離 proj >= distThreshold」判定成功！
-    // 不再因為手臂自然畫弧（稍微斜了一點）就把起點洗掉
-    if (proj >= this.distThreshold && dist > 0.001) {
-      const cosTheta = proj / dist;
-      const angleDeg = (Math.acos(Math.min(1, Math.max(-1, cosTheta))) * 180) / Math.PI;
-      const effectiveTol = Math.max(this.angleToleranceDeg, 52);
-      if (angleDeg <= effectiveTol) {
-        const startAnchor = { ...this.anchor };
-        const swipeAngleRad = Math.atan2(vy, vx);
-        this.anchor = { x, y };
-        this.cooldownUntil = nowMs + 320;
-        return { status: 'completed', x, y, startAnchor, swipeAngleRad, progress: 1 };
+      if (proj >= this.distThreshold && dist > 0.001) {
+        const cosTheta = proj / dist;
+        const angleDeg = (Math.acos(Math.min(1, Math.max(-1, cosTheta))) * 180) / Math.PI;
+        if (angleDeg <= effectiveTol) {
+          const startAnchor = { ...this.anchor };
+          const swipeAngleRad = Math.atan2(vy, vx);
+          this.anchor = { x, y };
+          this.cooldownUntil = nowMs + 320;
+          return { status: 'completed', x, y, startAnchor, swipeAngleRad, progress: 1, matchedIndex: i };
+        }
       }
     }
 
-    return { status: 'tracking', x, y, progress };
+    if (allRetreating) {
+      this.anchor = { x, y };
+      return { status: 'tracking', x, y, progress: 0 };
+    }
+    return { status: 'tracking', x, y, progress: bestProgress };
   }
 
   _evalSpoiled(x, y, dtMs, nowMs) {
     if (!this.anchor) this.anchor = { x, y };
     const dist = Math.hypot(x - this.anchor.x, y - this.anchor.y);
-    const swipeTrigger = Math.max(0.10, this.distThreshold * 0.72);
+    // 門檻越小代表動作能力越弱、越易抖動 -> 容許度反比放寬；且前 1/3 (0.85s) 防嚇到抽動
+    const baseTrigger = Math.min(0.28, Math.max(0.16, 0.34 - this.distThreshold));
+    const panicGrace = this.holdElapsedMs < 850 ? 1.35 : 1.0;
+    const swipeTrigger = baseTrigger * panicGrace;
 
     // 若不小心大幅揮動，代表誤切壞食材
     if (dist >= swipeTrigger) {

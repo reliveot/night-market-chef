@@ -1070,6 +1070,7 @@ class NightMarketGame {
     this.cogLastTickMs = performance.now();
 
     const arena = document.getElementById('cogChoiceArena');
+    arena.dataset.count = String(this.currentTask.options.length);
     arena.innerHTML = this.currentTask.options
       .map(
         (opt) => `
@@ -1253,12 +1254,20 @@ class NightMarketGame {
     // 2. 否則依整張畫面分區（上方區 / 左半區 / 右半區）自動對應，整張螢幕都能輕鬆選！
     if (!hitId) {
       let targetPos = 'LEFT';
-      if (normY < 0.44 && normX >= 0.25 && normX <= 0.75) {
-        targetPos = 'UP';
-      } else if (normY > 0.65 && normX >= 0.25 && normX <= 0.75 && cards.some((c) => c.dataset.pos === 'DOWN')) {
-        targetPos = 'DOWN';
-      } else if (normX >= 0.5) {
-        targetPos = 'RIGHT';
+      const hasUp = cards.some((c) => c.dataset.pos === 'UP');
+      const hasDown = cards.some((c) => c.dataset.pos === 'DOWN');
+      if (hasUp && !hasDown) {
+        // 3 選 1：上方全寬 (y < 0.46) / 下方左右
+        if (normY < 0.46) targetPos = 'UP';
+        else targetPos = normX >= 0.5 ? 'RIGHT' : 'LEFT';
+      } else if (hasUp && hasDown) {
+        // 4 選 1：上 / 下 / 左 / 右
+        if (normY < 0.36) targetPos = 'UP';
+        else if (normY > 0.66) targetPos = 'DOWN';
+        else targetPos = normX >= 0.5 ? 'RIGHT' : 'LEFT';
+      } else {
+        // 2 選 1：左半 / 右半
+        targetPos = normX >= 0.5 ? 'RIGHT' : 'LEFT';
       }
       const matched = cards.find((c) => c.dataset.pos === targetPos);
       if (matched) hitId = matched.dataset.dishId;

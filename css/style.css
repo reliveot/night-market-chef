@@ -933,32 +933,43 @@ input[type="range"] {
 
 .cog-choice-arena {
   position: relative;
-  width: min(96vw, 760px);
-  height: min(54dvh, 460px);
-  margin-top: 6px;
+  width: min(98vw, 920px);
+  height: min(64dvh, 560px);
+  margin-top: 4px;
   pointer-events: auto;
 }
 
 .cog-card {
   position: absolute;
-  width: clamp(148px, 31vw, 224px);
-  padding: 14px 10px;
-  border-radius: 24px;
-  background: linear-gradient(160deg, rgba(45, 14, 14, 0.9), rgba(20, 8, 8, 0.92));
-  border: 2px solid rgba(251, 191, 36, 0.45);
+  padding: 10px 12px;
+  border-radius: 22px;
+  background: linear-gradient(160deg, rgba(45, 14, 14, 0.58), rgba(18, 6, 6, 0.68));
+  border: 2.5px dashed rgba(251, 191, 36, 0.55);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 6px;
   cursor: pointer;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+  backdrop-filter: blur(2px);
 }
 
-.cog-card.pos-LEFT { left: 2%; top: 50%; transform: translateY(-50%); }
-.cog-card.pos-RIGHT { right: 2%; top: 50%; transform: translateY(-50%); }
-.cog-card.pos-UP { top: 0%; left: 50%; transform: translateX(-50%); }
-.cog-card.pos-DOWN { bottom: 0%; left: 50%; transform: translateX(-50%); }
+/* 2 選 1：左右各佔半邊大區 */
+.cog-choice-arena[data-count="2"] .cog-card.pos-LEFT { left: 0; top: 0; width: 49%; height: 100%; }
+.cog-choice-arena[data-count="2"] .cog-card.pos-RIGHT { right: 0; top: 0; width: 49%; height: 100%; }
+
+/* 3 選 1：上方滿版橫區＋下方左右兩大區 */
+.cog-choice-arena[data-count="3"] .cog-card.pos-UP { top: 0; left: 0; width: 100%; height: 43%; }
+.cog-choice-arena[data-count="3"] .cog-card.pos-LEFT { bottom: 0; left: 0; width: 49%; height: 55%; }
+.cog-choice-arena[data-count="3"] .cog-card.pos-RIGHT { bottom: 0; right: 0; width: 49%; height: 55%; }
+
+/* 4 選 1：上下左右四大區 */
+.cog-choice-arena[data-count="4"] .cog-card.pos-UP { top: 0; left: 16%; width: 68%; height: 32%; }
+.cog-choice-arena[data-count="4"] .cog-card.pos-LEFT { top: 34%; left: 0; width: 49%; height: 32%; }
+.cog-choice-arena[data-count="4"] .cog-card.pos-RIGHT { top: 34%; right: 0; width: 49%; height: 32%; }
+.cog-choice-arena[data-count="4"] .cog-card.pos-DOWN { bottom: 0; left: 16%; width: 68%; height: 32%; }
 
 .cog-card.hovering {
   border-width: 3px;
@@ -980,10 +991,14 @@ input[type="range"] {
 
 .cog-card-img-wrap {
   position: relative;
-  width: clamp(92px, 18vw, 134px);
-  height: clamp(92px, 18vw, 134px);
+  width: clamp(96px, 22vw, 164px);
+  height: clamp(96px, 22vw, 164px);
   display: grid;
   place-items: center;
+}
+.cog-choice-arena[data-count="4"] .cog-card-img-wrap {
+  width: clamp(72px, 15vw, 112px);
+  height: clamp(72px, 15vw, 112px);
 }
 
 .cog-card-img-wrap img {

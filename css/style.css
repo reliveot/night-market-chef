@@ -933,23 +933,23 @@ input[type="range"] {
 
 .cog-choice-arena {
   position: relative;
-  width: min(94vw, 620px);
-  height: min(56dvh, 410px);
+  width: min(96vw, 760px);
+  height: min(54dvh, 460px);
   margin-top: 6px;
   pointer-events: auto;
 }
 
 .cog-card {
   position: absolute;
-  width: clamp(136px, 34vw, 178px);
-  padding: 10px 8px;
-  border-radius: 20px;
+  width: clamp(148px, 31vw, 224px);
+  padding: 14px 10px;
+  border-radius: 24px;
   background: linear-gradient(160deg, rgba(45, 14, 14, 0.9), rgba(20, 8, 8, 0.92));
   border: 2px solid rgba(251, 191, 36, 0.45);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   cursor: pointer;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
@@ -961,8 +961,10 @@ input[type="range"] {
 .cog-card.pos-DOWN { bottom: 0%; left: 50%; transform: translateX(-50%); }
 
 .cog-card.hovering {
+  border-width: 3px;
   border-color: #4ade80;
-  box-shadow: 0 0 24px rgba(74, 222, 128, 0.65);
+  background: linear-gradient(160deg, rgba(20, 83, 45, 0.92), rgba(14, 48, 28, 0.94));
+  box-shadow: 0 0 32px rgba(74, 222, 128, 0.75);
 }
 
 .cog-card.wrong-shake {
@@ -978,8 +980,8 @@ input[type="range"] {
 
 .cog-card-img-wrap {
   position: relative;
-  width: clamp(84px, 20vw, 112px);
-  height: clamp(84px, 20vw, 112px);
+  width: clamp(92px, 18vw, 134px);
+  height: clamp(92px, 18vw, 134px);
   display: grid;
   place-items: center;
 }
@@ -1001,17 +1003,20 @@ input[type="range"] {
 }
 
 .cog-card-title {
-  font-size: 16px;
+  font-size: clamp(19px, 3.2vw, 25px);
+  line-height: 1.2;
+  text-align: center;
   font-weight: 900;
   color: #fffbeb;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.75);
 }
 
 .cog-card-dir {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   color: #fde68a;
   background: rgba(245, 158, 11, 0.2);
-  padding: 2px 8px;
+  padding: 3px 12px;
   border-radius: 99px;
 }
 
@@ -1971,38 +1976,6 @@ input[type="range"] {
     padding: 0 8px !important;
     font-size: 0.74rem !important;
   }
-}
-
-/* === V2.5 認知選餐大字大圖＋全畫面分區高亮 === */
-.cog-choice-arena {
-  width: min(96vw, 760px) !important;
-  height: min(54dvh, 460px) !important;
-}
-.cog-card {
-  width: clamp(148px, 31vw, 224px) !important;
-  padding: 14px 10px !important;
-  gap: 8px !important;
-  border-radius: 24px !important;
-}
-.cog-card-img-wrap {
-  width: clamp(92px, 18vw, 134px) !important;
-  height: clamp(92px, 18vw, 134px) !important;
-}
-.cog-card-title {
-  font-size: clamp(19px, 3.2vw, 25px) !important;
-  line-height: 1.2;
-  text-align: center;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.75);
-}
-.cog-card-dir {
-  font-size: 13px !important;
-  padding: 3px 12px !important;
-}
-.cog-card.hovering {
-  border-width: 3px !important;
-  border-color: #4ade80 !important;
-  background: linear-gradient(160deg, rgba(20, 83, 45, 0.92), rgba(14, 48, 28, 0.94)) !important;
-  box-shadow: 0 0 32px rgba(74, 222, 128, 0.75) !important;
 }
 
 /* === V2.6 顏色體感點畫面取色校正層（取色時隱藏所有食材與 HUD） === */

@@ -374,7 +374,6 @@ class NightMarketGame {
       document.querySelectorAll('#ctrlInputMode button').forEach((b) => {
         b.classList.toggle('active', b.dataset.val === 'color');
       });
-      document.getElementById('rowMirror')?.classList.toggle('hidden', false);
       welcomeModal?.classList.add('hidden');
       this.startGame();
     });
@@ -383,7 +382,6 @@ class NightMarketGame {
       document.querySelectorAll('#ctrlInputMode button').forEach((b) => {
         b.classList.toggle('active', b.dataset.val === 'camera');
       });
-      document.getElementById('rowMirror')?.classList.toggle('hidden', false);
       welcomeModal?.classList.add('hidden');
       this.startGame();
     });
@@ -392,7 +390,6 @@ class NightMarketGame {
       document.querySelectorAll('#segInputMode button').forEach((b) => {
         b.classList.toggle('active', b.dataset.val === 'touch');
       });
-      document.getElementById('rowMirror')?.classList.toggle('hidden', true);
       welcomeModal?.classList.add('hidden');
       this.startGame();
     });

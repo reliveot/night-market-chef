@@ -16,6 +16,7 @@ export class InputTracker {
     this.modelInitPromise = null;
     this.activeDelegate = 'GPU';
     this.consecutiveErrors = 0;
+    this.emptyHandFrames = 0;
 
     this.colorTracker = new ColorTracker();
 
@@ -24,6 +25,7 @@ export class InputTracker {
     this.isInferencing = false;
     this.inferTimer = null;
     this.lostFrames = 0;
+    this.emptyHandFrames = 0;
     this.lastInferTs = 0;
     this.lastVideoTime = -1;
     this.hasHandNow = false;
@@ -266,7 +268,7 @@ export class InputTracker {
       this.callbacks.onPoint(mapped.x, mapped.y, performance.now(), nearEdge, costMs);
     } else {
       this.lostFrames++;
-      if (this.lostFrames >= 3) {
+      if (this.lostFrames >= 6) {
         if (this.hasHandNow) {
           this.hasHandNow = false;
           this.callbacks.onTrackingState?.(false);
@@ -312,6 +314,7 @@ export class InputTracker {
 
       if (result.landmarks && result.landmarks.length > 0) {
         this.lostFrames = 0;
+        this.emptyHandFrames = 0;
         if (!this.hasHandNow) {
           this.hasHandNow = true;
           this.callbacks.onTrackingState?.(true);
@@ -326,7 +329,17 @@ export class InputTracker {
         this.callbacks.onPoint(mapped.x, mapped.y, performance.now(), nearEdge, inferCostMs);
       } else {
         this.lostFrames++;
-        if (this.lostFrames >= 3) {
+        this.emptyHandFrames++;
+        // 若部分手機 GPU delegate 靜默回傳空結果達 ~3.5 秒，自動切換 CPU delegate 自癒
+        if (this.emptyHandFrames >= 55 && this.activeDelegate === 'GPU') {
+          this.emptyHandFrames = 0;
+          try { this.handLandmarker.close?.(); } catch {}
+          this.handLandmarker = null;
+          this._createLandmarker('CPU')
+            .then((lm) => { this.handLandmarker = lm; })
+            .catch(() => {});
+        }
+        if (this.lostFrames >= 6) {
           if (this.hasHandNow) {
             this.hasHandNow = false;
             this.callbacks.onTrackingState?.(false);

@@ -87,8 +87,8 @@ export class GestureJudge {
   onTrackingLost() {
     this.filterX.reset();
     this.filterY.reset();
-    this.anchor = null;
-    this.stableSince = null;
+    // 保留最近一次起點長達 650ms，避免「揮太快中間漏幾格」就把起點洗掉
+    this.lostAtMs = performance.now();
     this.lastFrameTime = null;
     this.stirRefPoint = null;
   }
@@ -106,13 +106,23 @@ export class GestureJudge {
       return { status: 'cooldown', x, y, progress: 0, isMoving: false };
     }
 
+    // 若只是短暫遺失（<= 650ms，例如快速揮動造成模糊），直接延續原本起點，不重新穩定等待
+    if (this.lostAtMs) {
+      const gap = performance.now() - this.lostAtMs;
+      this.lostAtMs = null;
+      if (gap > 650) {
+        this.anchor = { x, y };
+        this.stableSince = nowMs;
+      }
+    }
+
     if (!this.stableSince) {
       this.stableSince = nowMs;
       this.anchor = { x, y };
       this.stirRefPoint = { x, y };
       return { status: 'stabilizing', x, y, progress: 0, isMoving: false };
     }
-    if (nowMs - this.stableSince < 140) {
+    if (nowMs - this.stableSince < 90) {
       this.anchor = { x, y };
       this.stirRefPoint = { x, y };
       return { status: 'stabilizing', x, y, progress: 0, isMoving: false };
@@ -136,24 +146,26 @@ export class GestureJudge {
     const dist = Math.hypot(vx, vy);
     const proj = vx * target.dx + vy * target.dy;
 
-    if (proj < -0.025) {
+    // 明顯往反方向回拉時，才把起點更新到折返點（方便玩家直接從新位置繼續揮）
+    if (proj < -0.045) {
       this.anchor = { x, y };
       return { status: 'tracking', x, y, progress: 0 };
     }
 
     const progress = Math.min(1, Math.max(0, proj / this.distThreshold));
 
-    if (dist >= this.distThreshold) {
+    // 以「目標方向有效推進距離 proj >= distThreshold」判定成功！
+    // 不再因為手臂自然畫弧（稍微斜了一點）就把起點洗掉
+    if (proj >= this.distThreshold && dist > 0.001) {
       const cosTheta = proj / dist;
       const angleDeg = (Math.acos(Math.min(1, Math.max(-1, cosTheta))) * 180) / Math.PI;
-      if (angleDeg <= this.angleToleranceDeg) {
+      const effectiveTol = Math.max(this.angleToleranceDeg, 52);
+      if (angleDeg <= effectiveTol) {
         const startAnchor = { ...this.anchor };
         const swipeAngleRad = Math.atan2(vy, vx);
         this.anchor = { x, y };
-        this.cooldownUntil = nowMs + 340;
+        this.cooldownUntil = nowMs + 320;
         return { status: 'completed', x, y, startAnchor, swipeAngleRad, progress: 1 };
-      } else {
-        this.anchor = { x, y };
       }
     }
 

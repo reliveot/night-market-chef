@@ -110,6 +110,20 @@
         </div>
         <div class="settings-grid">
           <div class="setting-group">
+            <label>操作方式（感應／觸控）</label>
+            <div class="seg-control" id="ctrlInputMode">
+              <button data-val="touch" class="active">👆 觸控滑動</button>
+              <button data-val="camera">🖐️ 手部偵測</button>
+              <button data-val="color">🎨 顏色追蹤</button>
+            </div>
+            <div class="checkbox-row" style="margin-top: 8px;">
+              <label class="toggle-label">
+                <input type="checkbox" id="chkMirror" checked /> 🪞 鏡像顯示鏡頭
+              </label>
+            </div>
+          </div>
+
+          <div class="setting-group">
             <label>過關方式</label>
             <div class="seg-control" id="ctrlGameMode">
               <button data-val="dishes" class="active">🍽️ 指定道數</button>
@@ -241,16 +255,8 @@
             </div>
 
             <div class="setting-group">
-              <label>操作方式與語音音效</label>
-              <div class="seg-control" id="ctrlInputMode">
-                <button data-val="touch" class="active">👆 觸控／滑鼠</button>
-                <button data-val="camera">🖐️ AI 手部體感</button>
-                <button data-val="color">🎨 顏色體感</button>
-              </div>
-              <div class="checkbox-row" style="margin-top: 10px;">
-                <label class="toggle-label">
-                  <input type="checkbox" id="chkMirror" checked /> 🪞 鏡像顯示鏡頭
-                </label>
+              <label>語音與音效</label>
+              <div class="checkbox-row">
                 <label class="toggle-label">
                   <input type="checkbox" id="chkSound" checked /> 🔊 音效回饋
                 </label>
@@ -512,7 +518,7 @@
         </button>
         <button id="btnWelcomeCamera" class="btn-primary btn-xl welcome-choice-btn">
           <span class="wc-icon">🖐️</span>
-          <span class="wc-text"><strong>AI 手部鏡頭開玩</strong><small>免拿物品，揮動雙手全螢幕互動</small></span>
+          <span class="wc-text"><strong>手部鏡頭開玩</strong><small>免拿物品，揮動雙手全螢幕互動</small></span>
         </button>
         <button id="btnWelcomeTouch" class="btn-primary btn-xl welcome-choice-btn welcome-touch-btn">
           <span class="wc-icon">👆</span>

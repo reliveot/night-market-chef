@@ -96,13 +96,13 @@ class NightMarketGame {
         onLost: () => this._handleLost(),
         onModelLoading: () => {
           const btn = document.getElementById('btnHudCam');
-          if (btn && this.settings.inputMode === 'camera') btn.textContent = '⏳ 載入AI…';
-          this._showToast('⏳ 正在載入 AI 手部追蹤模型，請稍候…');
+          if (btn && this.settings.inputMode === 'camera') btn.textContent = '⏳ 啟動鏡頭…';
+          this._showToast('⏳ 正在啟動手部偵測，請稍候…');
         },
         onModelReady: () => {
           const btn = document.getElementById('btnHudCam');
           if (btn && this.settings.inputMode === 'camera') btn.textContent = '👀 尋手中';
-          this._showToast('✅ AI 手部追蹤已就緒！把手舉到鏡頭前即可揮動');
+          this._showToast('✅ 手部偵測已就緒！把手舉到鏡頭前即可揮動');
         },
         onTrackingState: (detected) => {
           const btn = document.getElementById('btnHudCam');
@@ -117,7 +117,7 @@ class NightMarketGame {
           }
         },
         onModelError: (msg) => {
-          this._showToast(`⚠️ AI 模型錯誤：${msg}`);
+          this._showToast(`⚠️ 手部偵測錯誤：${msg}`);
         },
         onModelFallback: () => {
           this.settings.inputMode = 'touch';
@@ -126,7 +126,7 @@ class NightMarketGame {
           const camBtn = document.getElementById('btnHudCam');
           if (camBtn) { camBtn.textContent = '📷 開鏡頭'; camBtn.classList.remove('cam-on'); }
           this.tracker.start('touch');
-          this._showToast('⚠️ AI 模型載入失敗，已自動切換為觸控模式（亦可直接觸控滑動）');
+          this._showToast('⚠️ 手部偵測啟動失敗，已自動切換為觸控模式（亦可直接觸控滑動）');
         },
         onAutoDowngrade: () => {
           this.settings.lowPerf = true;
@@ -285,10 +285,6 @@ class NightMarketGame {
 
     document.getElementById('btnHudSettings')?.addEventListener('click', () => {
       this.quitToMenu();
-    });
-
-    document.getElementById('btnDismissGuide')?.addEventListener('click', () => {
-      this._dismissGuide();
     });
 
     document.querySelectorAll('#customDirGrid .dir-chip').forEach((chip) => {
@@ -572,7 +568,6 @@ class NightMarketGame {
   }
 
   _dismissGuide() {
-    document.getElementById('quickGuideBar')?.classList.add('fade-out');
   }
 
   _syncDirChipsUI() {
@@ -1030,8 +1025,8 @@ class NightMarketGame {
     foodImgBox?.classList.toggle('has-dual-arrows', cuts.length === 2);
 
     arrowOverlay.style.display = 'grid';
-    arrowSvg.style.transform = `rotate(${DIR_VECTORS[cut1.shownKey].deg}deg)`;
-    arrowOverlay.style.transform = '';
+    arrowOverlay.style.transform = `rotate(${DIR_VECTORS[cut1.shownKey].deg}deg)`;
+    arrowSvg.style.transform = '';
     arrowSvg.classList.toggle('normal', !cut1.isReverse);
     arrowSvg.classList.toggle('reverse', cut1.isReverse);
     arrowPath.setAttribute('fill', cut1.isReverse ? 'url(#gradCyan)' : 'url(#gradGold)');
@@ -1046,7 +1041,8 @@ class NightMarketGame {
       doubleCutBadge.classList.remove('hidden');
       if (cut2 && arrowOverlay2 && arrowSvg2 && arrowPath2) {
         arrowOverlay2.style.display = 'grid';
-        arrowSvg2.style.transform = `rotate(${DIR_VECTORS[cut2.shownKey].deg}deg)`;
+        arrowOverlay2.style.transform = `rotate(${DIR_VECTORS[cut2.shownKey].deg}deg)`;
+        arrowSvg2.style.transform = '';
         arrowSvg2.classList.toggle('normal', !cut2.isReverse);
         arrowSvg2.classList.toggle('reverse', cut2.isReverse);
         arrowPath2.setAttribute('fill', cut2.isReverse ? 'url(#gradCyan)' : 'url(#gradGold)');

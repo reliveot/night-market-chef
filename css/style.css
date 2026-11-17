@@ -2170,7 +2170,5 @@ input[type="range"] {
   margin-top: 6px;
 }
 
-/* === V2.6 雙刀連擊：兩支等大水彩箭頭同時置中（無先後順序） === */
-.arrow-overlay-second {
-  pointer-events: none;
-}
+/* === V2.6 雙刀連擊：兩支水彩箭頭同時置中 === */
+.arrow-overlay-second { pointer-events: none; }

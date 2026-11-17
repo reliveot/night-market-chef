@@ -1,4 +1,5 @@
 import { FilesetResolver, HandLandmarker } from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm';
+import { ColorTracker } from './color-tracker.js';
 
 export class InputTracker {
   constructor(videoEl, stageEl, callbacks) {
@@ -6,29 +7,120 @@ export class InputTracker {
     this.stageEl = stageEl;
     this.callbacks = callbacks;
 
-    this.mode = 'camera'; // 'camera' | 'touch'
+    this.mode = 'camera'; // 'camera' | 'color' | 'touch'
     this.mirrored = true;
     this.lowPerfMode = false;
 
     this.handLandmarker = null;
+    this.visionFileset = null;
     this.modelInitPromise = null;
+    this.activeDelegate = 'GPU';
+    this.consecutiveErrors = 0;
+
+    this.colorTracker = new ColorTracker();
+
     this.stream = null;
     this.isRunning = false;
     this.isInferencing = false;
     this.inferTimer = null;
     this.lostFrames = 0;
     this.lastInferTs = 0;
+    this.lastVideoTime = -1;
+    this.hasHandNow = false;
 
     // 效能自動降級監測器
     this.inferCostHistory = [];
     this.autoDowngraded = false;
 
-    this.offscreenCanvas = document.createElement('canvas');
-    this.offscreenCanvas.width = 256;
-    this.offscreenCanvas.height = 192;
-    this.offscreenCtx = this.offscreenCanvas.getContext('2d', { willReadFrequently: false });
-
     this._initPointerEvents();
+  }
+
+  // 共用 object-fit: cover 座標轉換：將原始攝影機 (rawX, rawY in 0..1) 對應到可視舞台 (normX, normY in 0..1)
+  mapVideoToStage(rawX, rawY) {
+    const vw = this.videoEl?.videoWidth || 640;
+    const vh = this.videoEl?.videoHeight || 480;
+    const sw = this.stageEl?.clientWidth || window.innerWidth || 640;
+    const sh = this.stageEl?.clientHeight || window.innerHeight || 480;
+
+    const scale = Math.max(sw / vw, sh / vh);
+    const renderedW = vw * scale;
+    const renderedH = vh * scale;
+    const offsetX = (renderedW - sw) / 2;
+    const offsetY = (renderedH - sh) / 2;
+
+    const mirroredX = this.mirrored ? 1.0 - rawX : rawX;
+    const stageX = (mirroredX * renderedW - offsetX) / sw;
+    const stageY = (rawY * renderedH - offsetY) / sh;
+
+    return {
+      x: Math.min(1, Math.max(0, stageX)),
+      y: Math.min(1, Math.max(0, stageY)),
+    };
+  }
+
+  // 反向轉換：點擊螢幕座標 (clientX, clientY) → 原始攝影機座標 (rawX, rawY in 0..1) 供顏色取樣
+  mapScreenToVideo(clientX, clientY) {
+    const rect = this.stageEl.getBoundingClientRect();
+    const vw = this.videoEl?.videoWidth || 640;
+    const vh = this.videoEl?.videoHeight || 480;
+    const sw = rect.width || 640;
+    const sh = rect.height || 480;
+
+    const sx = (clientX - rect.left) / sw;
+    const sy = (clientY - rect.top) / sh;
+
+    const scale = Math.max(sw / vw, sh / vh);
+    const renderedW = vw * scale;
+    const renderedH = vh * scale;
+    const offsetX = (renderedW - sw) / 2;
+    const offsetY = (renderedH - sh) / 2;
+
+    const mirroredX = (sx * sw + offsetX) / renderedW;
+    const rawX = this.mirrored ? 1.0 - mirroredX : mirroredX;
+    const rawY = (sy * sh + offsetY) / renderedH;
+
+    return {
+      rawX: Math.min(1, Math.max(0, rawX)),
+      rawY: Math.min(1, Math.max(0, rawY)),
+    };
+  }
+
+  sampleColorAtScreenPoint(clientX, clientY) {
+    const { rawX, rawY } = this.mapScreenToVideo(clientX, clientY);
+    return this.colorTracker.sampleAtVideoNorm(this.videoEl, rawX, rawY);
+  }
+
+  setColorTolerance(tol) {
+    this.colorTracker.setTolerance(tol);
+  }
+
+  hasColorTarget() {
+    return !!this.colorTracker.target;
+  }
+
+  getColorTarget() {
+    return this.colorTracker.target;
+  }
+
+  async _createLandmarker(delegate) {
+    if (!this.visionFileset) {
+      this.visionFileset = await FilesetResolver.forVisionTasks(
+        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
+      );
+    }
+    this.activeDelegate = delegate;
+    return HandLandmarker.createFromOptions(this.visionFileset, {
+      baseOptions: {
+        modelAssetPath:
+          'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+        delegate,
+      },
+      runningMode: 'VIDEO',
+      numHands: 1,
+      minHandDetectionConfidence: 0.25,
+      minHandPresenceConfidence: 0.25,
+      minTrackingConfidence: 0.25,
+    });
   }
 
   async initHandLandmarker() {
@@ -38,38 +130,53 @@ export class InputTracker {
     this.callbacks.onModelLoading?.();
     this.modelInitPromise = (async () => {
       try {
-        const vision = await FilesetResolver.forVisionTasks(
-          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
-        );
-        const opts = {
-          baseOptions: {
-            modelAssetPath:
-              'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
-            delegate: 'GPU',
-          },
-          runningMode: 'VIDEO',
-          numHands: 1,
-          minHandDetectionConfidence: 0.35,
-          minHandPresenceConfidence: 0.35,
-          minTrackingConfidence: 0.35,
-        };
         try {
-          this.handLandmarker = await HandLandmarker.createFromOptions(vision, opts);
+          this.handLandmarker = await this._createLandmarker('GPU');
         } catch {
-          // iPad / iOS / Android WebGL 若 GPU delegate 失敗，自動切換為 CPU delegate
-          opts.baseOptions.delegate = 'CPU';
-          this.handLandmarker = await HandLandmarker.createFromOptions(vision, opts);
+          this.handLandmarker = await this._createLandmarker('CPU');
         }
         this.callbacks.onModelReady?.();
         return true;
       } catch (err) {
         console.warn('HandLandmarker init error:', err);
         this.modelInitPromise = null;
+        this.callbacks.onModelError?.(err?.message || String(err));
         return false;
       }
     })();
 
     return this.modelInitPromise;
+  }
+
+  async _openWebcamStream() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('Camera API unavailable');
+    }
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
+      });
+    } catch {
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false,
+      });
+    }
+
+    this.videoEl.setAttribute('playsinline', '');
+    this.videoEl.setAttribute('webkit-playsinline', '');
+    this.videoEl.muted = true;
+    this.videoEl.srcObject = this.stream;
+    this.videoEl.style.display = 'block';
+
+    try {
+      await this.videoEl.play();
+    } catch {
+      this.videoEl.onloadedmetadata = () => {
+        this.videoEl.play().catch(() => {});
+      };
+    }
   }
 
   async start(mode, options = {}) {
@@ -80,39 +187,13 @@ export class InputTracker {
     this.isRunning = true;
     this.inferCostHistory = [];
     this.lastInferTs = 0;
+    this.lastVideoTime = -1;
+    this.consecutiveErrors = 0;
+    this.hasHandNow = false;
+    this.lostFrames = 0;
 
     if (mode === 'camera') {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera API unavailable');
-      }
-
-      try {
-        this.stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-          audio: false,
-        });
-      } catch {
-        this.stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false,
-        });
-      }
-
-      this.videoEl.setAttribute('playsinline', '');
-      this.videoEl.setAttribute('webkit-playsinline', '');
-      this.videoEl.muted = true;
-      this.videoEl.srcObject = this.stream;
-      this.videoEl.style.display = 'block';
-
-      try {
-        await this.videoEl.play();
-      } catch {
-        this.videoEl.onloadedmetadata = () => {
-          this.videoEl.play().catch(() => {});
-        };
-      }
-
-      // 鏡頭畫面已成功顯示後，非同步啟動 AI 手部模型推論
+      await this._openWebcamStream();
       this.initHandLandmarker().then((ready) => {
         if (!this.isRunning || this.mode !== 'camera') return;
         if (ready) {
@@ -122,6 +203,11 @@ export class InputTracker {
           this.callbacks.onModelFallback?.();
         }
       });
+    } else if (mode === 'color') {
+      await this._openWebcamStream();
+      this.colorTracker.resetHistory();
+      const intervalMs = this.lowPerfMode ? 80 : 50;
+      this.inferTimer = setInterval(() => this._runColorInference(), intervalMs);
     }
   }
 
@@ -131,11 +217,15 @@ export class InputTracker {
     if (this.isRunning && this.mode === 'camera' && this.handLandmarker) {
       clearInterval(this.inferTimer);
       this.inferTimer = setInterval(() => this._runCameraInference(), enabled ? 100 : 66);
+    } else if (this.isRunning && this.mode === 'color') {
+      clearInterval(this.inferTimer);
+      this.inferTimer = setInterval(() => this._runColorInference(), enabled ? 80 : 50);
     }
   }
 
   stop() {
     this.isRunning = false;
+    this.hasHandNow = false;
     if (this.inferTimer) {
       clearInterval(this.inferTimer);
       this.inferTimer = null;
@@ -153,40 +243,66 @@ export class InputTracker {
     }
   }
 
+  _runColorInference() {
+    if (!this.isRunning || this.mode !== 'color' || !this.videoEl) return;
+    if (this.videoEl.paused && this.stream) {
+      this.videoEl.play().catch(() => {});
+    }
+    if (this.videoEl.readyState < 2 || this.videoEl.videoWidth === 0 || this.videoEl.videoHeight === 0) return;
+    if (!this.colorTracker.target) return;
+
+    const t0 = performance.now();
+    const res = this.colorTracker.detect(this.videoEl);
+    const costMs = performance.now() - t0;
+
+    if (res) {
+      this.lostFrames = 0;
+      if (!this.hasHandNow) {
+        this.hasHandNow = true;
+        this.callbacks.onTrackingState?.(true);
+      }
+      const mapped = this.mapVideoToStage(res.rawX, res.rawY);
+      const nearEdge = mapped.x < 0.05 || mapped.x > 0.95 || mapped.y < 0.05 || mapped.y > 0.95;
+      this.callbacks.onPoint(mapped.x, mapped.y, performance.now(), nearEdge, costMs);
+    } else {
+      this.lostFrames++;
+      if (this.lostFrames >= 3) {
+        if (this.hasHandNow) {
+          this.hasHandNow = false;
+          this.callbacks.onTrackingState?.(false);
+        }
+        this.callbacks.onLost();
+      }
+    }
+  }
+
   async _runCameraInference() {
-    if (!this.isRunning || this.isInferencing || !this.handLandmarker || !this.videoEl || this.videoEl.readyState < 2) return;
-    const vw = this.videoEl.videoWidth || 640;
-    const vh = this.videoEl.videoHeight || 480;
-    if (vw === 0 || vh === 0) return;
+    if (!this.isRunning || this.isInferencing || !this.handLandmarker || !this.videoEl) return;
+    if (this.videoEl.paused && this.stream) {
+      this.videoEl.play().catch(() => {});
+    }
+    if (this.videoEl.readyState < 2 || this.videoEl.videoWidth === 0 || this.videoEl.videoHeight === 0) return;
+
+    if (this.videoEl.currentTime === this.lastVideoTime) return;
+    this.lastVideoTime = this.videoEl.currentTime;
 
     this.isInferencing = true;
 
     try {
-      // 依真實鏡頭比例設定離屏畫布（手機直向 3:4 時為 192x256，橫向 4:3 為 256x192），避免壓扁手部導致辨識失敗
-      const maxDim = 256;
-      const cw = vw >= vh ? maxDim : Math.max(128, Math.round((vw / vh) * maxDim));
-      const ch = vh > vw ? maxDim : Math.max(128, Math.round((vh / vw) * maxDim));
-      if (this.offscreenCanvas.width !== cw || this.offscreenCanvas.height !== ch) {
-        this.offscreenCanvas.width = cw;
-        this.offscreenCanvas.height = ch;
-      }
-
       const t0 = performance.now();
-      this.offscreenCtx.drawImage(this.videoEl, 0, 0, cw, ch);
-
-      // MediaPipe VIDEO 模式必須使用嚴格遞增的整數毫秒 timestamp
       const ts = Math.max(this.lastInferTs + 1, Math.round(t0));
       this.lastInferTs = ts;
 
-      const result = this.handLandmarker.detectForVideo(this.offscreenCanvas, ts);
+      const result = this.handLandmarker.detectForVideo(this.videoEl, ts);
       const inferCostMs = performance.now() - t0;
+      this.consecutiveErrors = 0;
 
       if (!this.lowPerfMode && !this.autoDowngraded) {
         this.inferCostHistory.push(inferCostMs);
         if (this.inferCostHistory.length >= 12) {
           const avg = this.inferCostHistory.reduce((a, b) => a + b, 0) / this.inferCostHistory.length;
           this.inferCostHistory = [];
-          if (avg > 58) {
+          if (avg > 70) {
             this.autoDowngraded = true;
             this.setLowPerf(true);
             this.callbacks.onAutoDowngrade?.(Math.round(avg));
@@ -196,23 +312,41 @@ export class InputTracker {
 
       if (result.landmarks && result.landmarks.length > 0) {
         this.lostFrames = 0;
+        if (!this.hasHandNow) {
+          this.hasHandNow = true;
+          this.callbacks.onTrackingState?.(true);
+        }
         const lm = result.landmarks[0];
         const rawX = (lm[0].x + lm[5].x + lm[17].x) / 3;
         const rawY = (lm[0].y + lm[5].y + lm[17].y) / 3;
 
-        const normX = this.mirrored ? 1.0 - rawX : rawX;
-        const normY = rawY;
-        const nearEdge = rawX < 0.05 || rawX > 0.95 || rawY < 0.05 || rawY > 0.95;
+        const mapped = this.mapVideoToStage(rawX, rawY);
+        const nearEdge = mapped.x < 0.05 || mapped.x > 0.95 || mapped.y < 0.05 || mapped.y > 0.95;
 
-        this.callbacks.onPoint(normX, normY, performance.now(), nearEdge, inferCostMs);
+        this.callbacks.onPoint(mapped.x, mapped.y, performance.now(), nearEdge, inferCostMs);
       } else {
         this.lostFrames++;
         if (this.lostFrames >= 3) {
+          if (this.hasHandNow) {
+            this.hasHandNow = false;
+            this.callbacks.onTrackingState?.(false);
+          }
           this.callbacks.onLost();
         }
       }
     } catch (err) {
       console.warn('Inference error:', err);
+      this.consecutiveErrors++;
+      if (this.consecutiveErrors >= 3 && this.activeDelegate === 'GPU') {
+        this.consecutiveErrors = 0;
+        try {
+          this.handLandmarker.close?.();
+        } catch {}
+        this.handLandmarker = null;
+        this._createLandmarker('CPU')
+          .then((lm) => { this.handLandmarker = lm; })
+          .catch(() => {});
+      }
     } finally {
       this.isInferencing = false;
     }
@@ -232,7 +366,8 @@ export class InputTracker {
 
     this.stageEl.addEventListener('pointerdown', (e) => {
       if (!this.isRunning) return;
-      if (e.target.closest('button')) return;
+      if (e.target.closest('button') || e.target.closest('.color-calib-bar')) return;
+      if (this.mode === 'color') return; // 顏色模式改由 game.js 處理點擊取色，不觸發模擬滑動
       isPointerDown = true;
       lastPt = getNormPos(e);
       this.callbacks.onPoint(lastPt.x, lastPt.y, performance.now(), false, 0);
@@ -246,7 +381,7 @@ export class InputTracker {
     });
 
     this.stageEl.addEventListener('pointermove', (e) => {
-      if (!this.isRunning) return;
+      if (!this.isRunning || this.mode === 'color') return;
       lastPt = getNormPos(e);
       if (isPointerDown || this.mode === 'touch') {
         this.callbacks.onPoint(lastPt.x, lastPt.y, performance.now(), false, 0);

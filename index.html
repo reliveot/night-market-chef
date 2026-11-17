@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>台灣夜市料理秀 V2.5｜體感大型機台復健遊戲</title>
+  <title>台灣夜市料理秀 V2.6｜體感大型機台復健遊戲</title>
   <meta name="description" content="開啟即玩！透過手部揮動完成50道台灣夜市手繪水彩美食的體感機台式復健遊戲，支援滿版鏡像鏡頭、四大烹飪手感、壞食材抑制與認知推理選菜。" />
   <link rel="stylesheet" href="css/style.css?v=2.5" />
   <script>
@@ -244,7 +244,8 @@
               <label>操作方式與語音音效</label>
               <div class="seg-control" id="ctrlInputMode">
                 <button data-val="touch" class="active">👆 觸控／滑鼠</button>
-                <button data-val="camera">📷 滿版鏡頭體感</button>
+                <button data-val="camera">🖐️ AI 手部體感</button>
+                <button data-val="color">🎨 顏色體感</button>
               </div>
               <div class="checkbox-row" style="margin-top: 10px;">
                 <label class="toggle-label">
@@ -420,6 +421,28 @@
             <p id="celebrateDishDesc" class="celebrate-desc"></p>
           </div>
         </div>
+
+        <!-- 🎨 顏色體感取色校正層（啟動時隱藏所有食材與 HUD，純淨點畫面取色） -->
+        <div id="colorCalibOverlay" class="color-calib-overlay hidden">
+          <div class="color-calib-top-pill">
+            <span id="colorSwatch" class="color-swatch"></span>
+            <span id="colorCalibPrompt">🎨 請直接點一下畫面中的彩色物品或腕帶</span>
+          </div>
+          <div class="color-calib-bar">
+            <div class="color-tol-row">
+              <span class="color-tol-label">偵測寬容度：</span>
+              <div class="seg-control" id="ctrlColorTol">
+                <button data-val="strict">精準</button>
+                <button data-val="normal" class="active">標準</button>
+                <button data-val="wide">寬鬆</button>
+              </div>
+            </div>
+            <div class="color-calib-actions">
+              <button id="btnColorCalibBack" class="btn-outline">🏠 返回</button>
+              <button id="btnColorCalibStart" class="btn-primary" disabled>✅ 開始料理</button>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -452,13 +475,17 @@
 
   <div id="modalWelcome" class="modal">
     <div class="modal-box welcome-modal-box">
-      <div class="welcome-badge">🏮 台灣夜市料理秀 V2.5</div>
+      <div class="welcome-badge">🏮 台灣夜市料理秀 V2.6</div>
       <h2>選擇遊玩方式開始出餐！</h2>
       <p class="welcome-how-to">👋 <strong>怎麼玩：</strong>照箭頭方向揮動手部完成備料，第 5 步完成料理出餐！</p>
       <div class="welcome-btn-stack">
+        <button id="btnWelcomeColor" class="btn-primary btn-xl welcome-choice-btn welcome-color-btn">
+          <span class="wc-icon">🎨</span>
+          <span class="wc-text"><strong>顏色體感開玩（推薦）</strong><small>手持彩色球或手腕綁色帶，點畫面即可追蹤</small></span>
+        </button>
         <button id="btnWelcomeCamera" class="btn-primary btn-xl welcome-choice-btn">
-          <span class="wc-icon">📷</span>
-          <span class="wc-text"><strong>鏡頭體感開玩</strong><small>揮動雙手或身體，全螢幕互動體驗</small></span>
+          <span class="wc-icon">🖐️</span>
+          <span class="wc-text"><strong>AI 手部鏡頭開玩</strong><small>免拿物品，揮動雙手全螢幕互動</small></span>
         </button>
         <button id="btnWelcomeTouch" class="btn-primary btn-xl welcome-choice-btn welcome-touch-btn">
           <span class="wc-icon">👆</span>

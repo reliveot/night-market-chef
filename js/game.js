@@ -95,10 +95,26 @@ class NightMarketGame {
         onPoint: (x, y, t, nearEdge) => this._handlePoint(x, y, t, nearEdge),
         onLost: () => this._handleLost(),
         onModelLoading: () => {
+          const btn = document.getElementById('btnHudCam');
+          if (btn && this.settings.inputMode === 'camera') btn.textContent = '⏳ 載入AI…';
           this._showToast('⏳ 正在載入 AI 手部追蹤模型，請稍候…');
         },
         onModelReady: () => {
+          const btn = document.getElementById('btnHudCam');
+          if (btn && this.settings.inputMode === 'camera') btn.textContent = '👀 尋手中';
           this._showToast('✅ AI 手部追蹤已就緒！把手舉到鏡頭前即可揮動');
+        },
+        onTrackingState: (detected) => {
+          const btn = document.getElementById('btnHudCam');
+          if (!btn) return;
+          if (this.settings.inputMode === 'camera') {
+            btn.textContent = detected ? '🖐️ 追蹤中' : '👀 尋手中';
+          } else if (this.settings.inputMode === 'color') {
+            btn.textContent = detected ? '🎨 追蹤中' : '🎨 尋色中';
+          }
+        },
+        onModelError: (msg) => {
+          this._showToast(`⚠️ AI 模型錯誤：${msg}`);
         },
         onModelFallback: () => {
           this.settings.inputMode = 'touch';
@@ -233,6 +249,10 @@ class NightMarketGame {
 
     document.getElementById('btnHudCam')?.addEventListener('click', async () => {
       const btn = document.getElementById('btnHudCam');
+      if (this.settings.inputMode === 'color') {
+        this._enterColorCalibration(true);
+        return;
+      }
       if (this.settings.inputMode === 'camera' && this.tracker.stream) {
         this.settings.inputMode = 'touch';
         document.getElementById('webcamVideo').style.display = 'none';
@@ -348,9 +368,19 @@ class NightMarketGame {
     document.getElementById('btnStartCustom').addEventListener('click', () => this.startGame());
 
     const welcomeModal = document.getElementById('modalWelcome');
+    document.getElementById('btnWelcomeColor')?.addEventListener('click', () => {
+      this.sound.unlock();
+      this.settings.inputMode = 'color';
+      document.querySelectorAll('#ctrlInputMode button').forEach((b) => {
+        b.classList.toggle('active', b.dataset.val === 'color');
+      });
+      document.getElementById('rowMirror')?.classList.toggle('hidden', false);
+      welcomeModal?.classList.add('hidden');
+      this.startGame();
+    });
     document.getElementById('btnWelcomeCamera')?.addEventListener('click', () => {
       this.settings.inputMode = 'camera';
-      document.querySelectorAll('#segInputMode button').forEach((b) => {
+      document.querySelectorAll('#ctrlInputMode button').forEach((b) => {
         b.classList.toggle('active', b.dataset.val === 'camera');
       });
       document.getElementById('rowMirror')?.classList.toggle('hidden', false);
@@ -418,6 +448,52 @@ class NightMarketGame {
     document.getElementById('btnOpenGallery').addEventListener('click', () => this._openGalleryModal('ALL'));
     document.getElementById('btnCloseGallery').addEventListener('click', () => {
       document.getElementById('modalGallery').classList.add('hidden');
+    });
+
+    // 🎨 顏色體感：點擊畫面取色（僅在 CALIBRATING_COLOR 狀態生效，畫面無任何食材）
+    document.getElementById('playStage')?.addEventListener('pointerdown', (e) => {
+      if (this.state !== 'CALIBRATING_COLOR') return;
+      if (e.target.closest('.color-calib-bar') || e.target.closest('button')) return;
+      const picked = this.tracker.sampleColorAtScreenPoint(e.clientX, e.clientY);
+      if (!picked) {
+        this._showToast('請等鏡頭畫面出現後再點選物品喔');
+        return;
+      }
+      const swatch = document.getElementById('colorSwatch');
+      const prompt = document.getElementById('colorCalibPrompt');
+      const startBtn = document.getElementById('btnColorCalibStart');
+      if (swatch) swatch.style.background = picked.hex;
+      if (prompt) prompt.textContent = '✅ 已鎖定顏色！揮動看看光圈，穩了就按「開始料理」';
+      if (startBtn) startBtn.disabled = false;
+      this.sound.speak('已鎖定顏色，揮動看看光圈是否跟隨');
+    });
+
+    document.querySelectorAll('#ctrlColorTol button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#ctrlColorTol button').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.tracker.setColorTolerance(btn.dataset.val);
+      });
+    });
+
+    document.getElementById('btnColorCalibBack')?.addEventListener('click', () => {
+      this._exitColorCalibration();
+      this.tracker.stop();
+      this.state = 'IDLE';
+      document.getElementById('modalWelcome')?.classList.remove('hidden');
+    });
+
+    document.getElementById('btnColorCalibStart')?.addEventListener('click', async () => {
+      if (!this.tracker.hasColorTarget()) return;
+      const resuming = this._colorCalibResuming;
+      this._exitColorCalibration();
+      if (resuming) {
+        this.state = 'PLAYING';
+      } else {
+        this.state = 'PLAYING';
+        await this._startNextDish();
+        this._startGameClock();
+      }
     });
     document.querySelectorAll('.gallery-tab').forEach((tab) => {
       tab.addEventListener('click', () => {
@@ -636,14 +712,21 @@ class NightMarketGame {
     const camBtn = document.getElementById('btnHudCam');
     videoEl.classList.toggle('mirrored', this.settings.mirrored);
 
-    if (this.settings.inputMode === 'camera') {
+    if (this.settings.inputMode === 'camera' || this.settings.inputMode === 'color') {
       try {
-        await this.tracker.start('camera', {
+        await this.tracker.start(this.settings.inputMode, {
           mirrored: this.settings.mirrored,
           lowPerf: this.settings.lowPerf,
         });
         videoEl.style.display = 'block';
-        if (camBtn) { camBtn.textContent = '📷 鏡頭中'; camBtn.classList.add('cam-on'); }
+        if (camBtn) {
+          camBtn.textContent = this.settings.inputMode === 'color' ? '🎨 換色' : '📷 鏡頭中';
+          camBtn.classList.add('cam-on');
+        }
+        if (this.settings.inputMode === 'color') {
+          this._enterColorCalibration(false);
+          return;
+        }
       } catch {
         this._showToast('無法開啟攝影機，已自動切換為「觸控／滑鼠模式」');
         this.settings.inputMode = 'touch';
@@ -1032,6 +1115,33 @@ class NightMarketGame {
     }
   }
 
+  _enterColorCalibration(resuming = false) {
+    this._colorCalibResuming = resuming;
+    this.state = 'CALIBRATING_COLOR';
+    this.trail = [];
+    this.cursorPos = null;
+    document.getElementById('screenGame')?.classList.add('color-calibrating');
+    document.getElementById('colorCalibOverlay')?.classList.remove('hidden');
+
+    const target = this.tracker.getColorTarget();
+    const swatch = document.getElementById('colorSwatch');
+    const prompt = document.getElementById('colorCalibPrompt');
+    const startBtn = document.getElementById('btnColorCalibStart');
+    if (swatch) swatch.style.background = target ? target.hex : 'rgba(255,255,255,0.18)';
+    if (prompt) {
+      prompt.textContent = target
+        ? '✅ 可直接點畫面換色，或按「開始料理」'
+        : '🎨 請直接點一下畫面中的彩色物品或腕帶';
+    }
+    if (startBtn) startBtn.disabled = !target;
+    this.sound.speak('請直接點一下畫面中的彩色物品或腕帶');
+  }
+
+  _exitColorCalibration() {
+    document.getElementById('screenGame')?.classList.remove('color-calibrating');
+    document.getElementById('colorCalibOverlay')?.classList.add('hidden');
+  }
+
   _handlePoint(x, y, nowMs) {
     // 記錄手部游標與光軌座標
     const canvas = document.getElementById('fxCanvas');
@@ -1141,6 +1251,8 @@ class NightMarketGame {
       let targetPos = 'LEFT';
       if (normY < 0.44 && normX >= 0.25 && normX <= 0.75) {
         targetPos = 'UP';
+      } else if (normY > 0.65 && normX >= 0.25 && normX <= 0.75 && cards.some((c) => c.dataset.pos === 'DOWN')) {
+        targetPos = 'DOWN';
       } else if (normX >= 0.5) {
         targetPos = 'RIGHT';
       }
@@ -1551,7 +1663,7 @@ class NightMarketGame {
       const dt = Math.min(0.05, (ts - lastTs) / 1000);
       lastTs = ts;
 
-      if (this.state === 'PLAYING' || this.state === 'ANIMATING' || this.state === 'CELEBRATING') {
+      if (this.state === 'PLAYING' || this.state === 'ANIMATING' || this.state === 'CELEBRATING' || this.state === 'CALIBRATING_COLOR') {
         this._renderSimBackground(ts);
         this._renderFXCanvas(dt);
       }
@@ -1561,7 +1673,7 @@ class NightMarketGame {
   }
 
   _renderSimBackground(t) {
-    if (this.settings.inputMode === 'camera') return;
+    if (this.settings.inputMode === 'camera' || this.settings.inputMode === 'color') return;
     const canvas = document.getElementById('bgSimCanvas');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');

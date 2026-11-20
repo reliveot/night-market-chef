@@ -284,7 +284,7 @@ class NightMarketGame {
     });
 
     document.getElementById('btnHudSettings')?.addEventListener('click', () => {
-      this.quitToMenu();
+      this._openSettingsFrom('game');
     });
 
     document.querySelectorAll('#customDirGrid .dir-chip').forEach((chip) => {
@@ -395,7 +395,11 @@ class NightMarketGame {
     document.getElementById('btnWelcomeSettings')?.addEventListener('click', () => {
       this.sound.unlock();
       welcomeModal?.classList.add('hidden');
-      this.quitToMenu();
+      this._openSettingsFrom('welcome');
+    });
+
+    document.getElementById('btnCancelSettings')?.addEventListener('click', () => {
+      this._cancelSettings();
     });
 
     // HUD 音效與結束／打烊結算按鈕
@@ -432,13 +436,11 @@ class NightMarketGame {
       this._syncPerfButtonUI();
     });
 
-    document.getElementById('btnFullscreen')?.addEventListener('click', () => {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen?.().catch(() => {});
-      } else {
-        document.exitFullscreen?.().catch(() => {});
-      }
+    ['btnFullscreen', 'btnWelcomeFullscreen', 'btnHudFullscreen'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('click', () => this._toggleFullscreen());
     });
+    document.addEventListener('fullscreenchange', () => this._syncFullscreenUI());
+    this._syncFullscreenUI();
 
     // 50 道夜市美食收集圖鑑彈窗
     document.getElementById('btnOpenGallery').addEventListener('click', () => this._openGalleryModal('ALL'));
@@ -1621,6 +1623,163 @@ class NightMarketGame {
     }, 1150);
   }
 
+  _toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  }
+
+  _syncFullscreenUI() {
+    const isFs = !!document.fullscreenElement;
+    const btnTop = document.getElementById('btnFullscreen');
+    const btnWel = document.getElementById('btnWelcomeFullscreen');
+    const btnHud = document.getElementById('btnHudFullscreen');
+    if (btnTop) {
+      btnTop.textContent = isFs ? '⛶ 退出全螢幕' : '⛶ 全螢幕';
+      btnTop.classList.toggle('fs-active', isFs);
+    }
+    if (btnWel) {
+      btnWel.textContent = isFs ? '⛶ 退出全螢幕' : '⛶ 全螢幕';
+      btnWel.classList.toggle('active', isFs);
+    }
+    if (btnHud) {
+      btnHud.classList.toggle('fs-active', isFs);
+      btnHud.title = isFs ? '退出全螢幕' : '切換全螢幕';
+    }
+  }
+
+  _openSettingsFrom(origin) {
+    this._settingsOrigin = origin;
+    this._settingsSnapshot = {
+      settings: JSON.parse(JSON.stringify(this.settings)),
+      presetBadge: document.getElementById('presetStatusBadge')?.textContent || '',
+      activePreset: document.querySelector('.stage-card.active')?.dataset.preset || null,
+      sfxVolume: this.sound.sfxVolume,
+      bgmVolume: this.sound.bgmVolume,
+      voiceVolume: this.sound.voiceVolume,
+    };
+
+    if (origin === 'game') {
+      this.sound.stopBgm();
+      clearTimeout(this.celebrateTimer);
+      clearInterval(this.timerInterval);
+      this.tracker.stop();
+      this.state = 'MENU';
+    }
+    this._switchScreen('screenStart');
+  }
+
+  async _cancelSettings() {
+    const snap = this._settingsSnapshot;
+    if (snap) {
+      this.settings = JSON.parse(JSON.stringify(snap.settings));
+      this.sound.soundEnabled = this.settings.sound;
+      this.sound.voiceEnabled = this.settings.voice;
+      this.sound.bgmEnabled = this.settings.bgm;
+      this.sound.sfxVolume = snap.sfxVolume;
+      this.sound.bgmVolume = snap.bgmVolume;
+      this.sound.voiceVolume = snap.voiceVolume;
+      this._syncAllSettingsUI(snap.activePreset, snap.presetBadge);
+    }
+
+    if (this._settingsOrigin === 'game') {
+      this._switchScreen('screenGame');
+      this._resizeCanvases();
+      const videoEl = document.getElementById('webcamVideo');
+      const camBtn = document.getElementById('btnHudCam');
+      videoEl?.classList.toggle('mirrored', this.settings.mirrored);
+      if (this.settings.inputMode === 'camera' || this.settings.inputMode === 'color') {
+        try {
+          await this.tracker.start(this.settings.inputMode, {
+            mirrored: this.settings.mirrored,
+            lowPerf: this.settings.lowPerf,
+          });
+          if (videoEl) videoEl.style.display = 'block';
+          if (camBtn) {
+            camBtn.textContent = this.settings.inputMode === 'color' ? '🎨 換色' : '📷 鏡頭中';
+            camBtn.classList.add('cam-on');
+          }
+        } catch {
+          this.settings.inputMode = 'touch';
+          if (videoEl) videoEl.style.display = 'none';
+          await this.tracker.start('touch');
+        }
+      } else {
+        if (videoEl) videoEl.style.display = 'none';
+        if (camBtn) { camBtn.textContent = '📷 開鏡頭'; camBtn.classList.remove('cam-on'); }
+        await this.tracker.start('touch');
+      }
+      if (this.settings.bgm) this.sound.startBgm();
+      this.state = 'PLAYING';
+      if (!this.currentTask) {
+        await this._startNextDish();
+      }
+      this._startGameClock();
+      this._showToast('已取消修改，繼續原本的料理！');
+    } else {
+      document.getElementById('modalWelcome')?.classList.remove('hidden');
+    }
+  }
+
+  _syncAllSettingsUI(activePreset, presetBadge) {
+    this._syncSegVal('ctrlGameMode', this.settings.gameMode);
+    this._syncSegVal('ctrlDishCount', this.settings.targetDishes);
+    this._syncSegVal('ctrlTimeSec', this.settings.timeLimitSec);
+    this._syncSegVal('ctrlCategoryFilter', this.settings.categoryFilter);
+    this._syncSegVal('ctrlTrainingMode', this.settings.trainingMode);
+    this._syncSegVal('ctrlCogChoices', this.settings.cogChoices);
+    this._syncSegVal('ctrlStirMode', this.settings.stirMode);
+    this._syncSegVal('ctrlStirMult', this.settings.stirMult);
+    this._syncSegVal('ctrlDirRule', this.settings.dirRule);
+    this._syncSegVal('ctrlAngleTol', this.settings.angleTol);
+    this._syncSegVal('ctrlInputMode', this.settings.inputMode);
+
+    this._syncDirChipsUI();
+    this._syncSoundBtnUI();
+    this._syncBgmBtnUI();
+    this._syncPerfButtonUI();
+
+    const pct = Math.round(this.settings.distThreshold * 100);
+    const rngDist = document.getElementById('rngDistThreshold');
+    const lblDist = document.getElementById('lblDistThreshold');
+    if (rngDist) rngDist.value = pct;
+    if (lblDist) lblDist.textContent = `${pct}%`;
+
+    const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+    setChk('chkEnableSpoiled', this.settings.enableSpoiled);
+    setChk('chkEnableDoubleCut', this.settings.enableDoubleCut);
+    setChk('chkEnableStir', this.settings.enableStir);
+    setChk('chkMirror', this.settings.mirrored);
+    setChk('chkSound', this.settings.sound);
+    setChk('chkVoice', this.settings.voice);
+    setChk('chkBgm', this.settings.bgm);
+
+    document.getElementById('webcamVideo')?.classList.toggle('mirrored', this.settings.mirrored);
+
+    const setVol = (rngId, lblId, ratio) => {
+      const v = Math.round((ratio ?? 1) * 100);
+      const r = document.getElementById(rngId);
+      const l = document.getElementById(lblId);
+      if (r) r.value = v;
+      if (l) l.textContent = `${v}%`;
+    };
+    setVol('rngSfxVol', 'lblSfxVol', this.sound.sfxVolume);
+    setVol('rngBgmVol', 'lblBgmVol', this.sound.bgmVolume);
+    setVol('rngVoiceVol', 'lblVoiceVol', this.sound.voiceVolume);
+
+    if (activePreset !== undefined) {
+      document.querySelectorAll('.stage-card').forEach((b) => {
+        b.classList.toggle('active', b.dataset.preset === activePreset);
+      });
+    }
+    if (presetBadge) {
+      const badgeEl = document.getElementById('presetStatusBadge');
+      if (badgeEl) badgeEl.textContent = presetBadge;
+    }
+  }
+
   quitToMenu() {
     this.sound.stopBgm();
     clearTimeout(this.celebrateTimer);
@@ -1953,57 +2112,228 @@ class NightMarketGame {
     this.callouts = this.callouts.filter((c) => c.life > 0);
   }
 
+  _resetCalibrationState() {
+    this.calibSwipes = [];
+    this.calibPendingThreshold = null;
+    this.calibStartPt = null;
+    this.calibPeakD = 0;
+    this.calibPeakTime = 0;
+    this.calibLastRecordMs = 0;
+
+    for (let i = 0; i < 3; i++) {
+      document.getElementById(`calibLamp${i}`)?.classList.remove('done');
+      const valEl = document.getElementById(`calibLampVal${i}`);
+      if (valEl) valEl.textContent = '--';
+    }
+    const bar = document.getElementById('calibLiveBarFill');
+    if (bar) bar.style.width = '0%';
+    const pct = document.getElementById('calibLivePct');
+    if (pct) pct.textContent = '0%';
+    const cnt = document.getElementById('calibCount');
+    if (cnt) cnt.textContent = '0 / 3';
+    const res = document.getElementById('calibResultVal');
+    if (res) res.textContent = `目前 ${Math.round(this.settings.distThreshold * 100)}%`;
+
+    const applyBtn = document.getElementById('btnCloseCalib');
+    if (applyBtn) {
+      applyBtn.disabled = true;
+      applyBtn.textContent = '✅ 套用此幅度';
+    }
+    this._setCalibFeedback('準備好了！請用舒適的幅度揮動第 1 次', '');
+  }
+
+  _setCalibFeedback(msg, tone = '') {
+    const el = document.getElementById('calibFeedbackMsg');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.remove('warn', 'ok');
+    if (tone) el.classList.add(tone);
+  }
+
   _initCalibrationModal() {
     this.calibSwipes = [];
     this.calibStartPt = null;
+    this.calibPendingThreshold = null;
+    this.calibPeakD = 0;
+    this.calibPeakTime = 0;
+    this.calibLastRecordMs = 0;
+
+    const closeModal = () => {
+      document.getElementById('modalCalibrate').classList.add('hidden');
+      this.tracker.stop();
+      this.state = 'MENU';
+    };
 
     document.getElementById('btnOpenCalibrate').addEventListener('click', async () => {
       document.getElementById('modalCalibrate').classList.remove('hidden');
-      this.calibSwipes = [];
-      this.calibStartPt = null;
-      document.getElementById('calibCount').textContent = '0 / 3';
+      this._resetCalibrationState();
       this.state = 'CALIBRATING';
+
+      const touchPad = document.getElementById('calibTouchPad');
+      if (touchPad) {
+        touchPad.classList.toggle('hidden', this.settings.inputMode !== 'touch');
+      }
+
+      if (this.settings.inputMode === 'color' && !this.tracker.hasColorTarget()) {
+        this._setCalibFeedback('🎨 顏色追蹤尚未取色：請先進入遊戲點選顏色道具，或改用手部／觸控模式校正', 'warn');
+        return;
+      }
+
+      if (this.settings.inputMode === 'touch') {
+        return;
+      }
+
       try {
         await this.tracker.start(this.settings.inputMode, {
           mirrored: this.settings.mirrored,
           lowPerf: this.settings.lowPerf,
         });
       } catch {
-        await this.tracker.start('touch');
+        if (touchPad) touchPad.classList.remove('hidden');
+        this._setCalibFeedback('無法開啟鏡頭，請直接在上方黃色框內滑動 3 次進行校正', 'warn');
       }
     });
 
+    const touchPad = document.getElementById('calibTouchPad');
+    if (touchPad) {
+      let padDown = false;
+      const toNorm = (e) => {
+        const rect = touchPad.getBoundingClientRect();
+        return {
+          x: Math.min(1, Math.max(0, (e.clientX - rect.left) / Math.max(1, rect.width))),
+          y: Math.min(1, Math.max(0, (e.clientY - rect.top) / Math.max(1, rect.height))),
+        };
+      };
+      touchPad.addEventListener('pointerdown', (e) => {
+        if (this.state !== 'CALIBRATING') return;
+        padDown = true;
+        touchPad.setPointerCapture?.(e.pointerId);
+        const pt = toNorm(e);
+        this.calibStartPt = pt;
+        this.calibPeakD = 0;
+        this.calibPeakTime = performance.now();
+        this._updateCalibration(pt.x, pt.y);
+      });
+      touchPad.addEventListener('pointermove', (e) => {
+        if (this.state !== 'CALIBRATING' || !padDown) return;
+        const pt = toNorm(e);
+        this._updateCalibration(pt.x, pt.y);
+      });
+      const endPad = () => {
+        if (!padDown) return;
+        padDown = false;
+        if (this.state === 'CALIBRATING' && this.calibPeakD >= 0.10 && this.calibSwipes.length < 3) {
+          this._commitCalibrationSwipe(this.calibPeakD, performance.now());
+        } else if (this.state === 'CALIBRATING' && this.calibPeakD >= 0.04 && this.calibPeakD < 0.10 && this.calibSwipes.length < 3) {
+          this._setCalibFeedback(`有偵測到移動（${Math.round(this.calibPeakD * 100)}%），幅度再大一點點喔！`, 'warn');
+          this.calibStartPt = null;
+          this.calibPeakD = 0;
+        }
+      };
+      touchPad.addEventListener('pointerup', endPad);
+      touchPad.addEventListener('pointercancel', endPad);
+    }
+
     document.getElementById('btnResetCalib').addEventListener('click', () => {
-      this.calibSwipes = [];
-      this.calibStartPt = null;
-      document.getElementById('calibCount').textContent = '0 / 3';
+      this._resetCalibrationState();
+    });
+
+    document.getElementById('btnCancelCalib')?.addEventListener('click', () => {
+      closeModal();
     });
 
     document.getElementById('btnCloseCalib').addEventListener('click', () => {
-      document.getElementById('modalCalibrate').classList.add('hidden');
-      this.tracker.stop();
-      this.state = 'MENU';
+      if (this.calibPendingThreshold != null) {
+        this.settings.distThreshold = this.calibPendingThreshold;
+        const pct = Math.round(this.calibPendingThreshold * 100);
+        const rng = document.getElementById('rngDistThreshold');
+        const lbl = document.getElementById('lblDistThreshold');
+        if (rng) rng.value = pct;
+        if (lbl) lbl.textContent = `${pct}%`;
+        this._showToast(`✅ 已套用動作幅度門檻：${pct}%`);
+      }
+      closeModal();
     });
   }
 
+  _commitCalibrationSwipe(peakD, nowMs) {
+    if (this.calibSwipes.length >= 3) return;
+    this.calibSwipes.push(peakD);
+    this.calibLastRecordMs = nowMs;
+    this.calibStartPt = null;
+    this.calibPeakD = 0;
+
+    const count = this.calibSwipes.length;
+    const idx = count - 1;
+    const swipePct = Math.round(peakD * 100);
+    document.getElementById(`calibLamp${idx}`)?.classList.add('done');
+    const valEl = document.getElementById(`calibLampVal${idx}`);
+    if (valEl) valEl.textContent = `${swipePct}%`;
+
+    document.getElementById('calibCount').textContent = `${count} / 3`;
+    this.sound.playPrepSound('cut', false);
+
+    const avg = this.calibSwipes.reduce((a, b) => a + b, 0) / count;
+    const recommended = Math.min(40, Math.max(8, Math.round(avg * 0.85 * 100)));
+    this.calibPendingThreshold = recommended / 100;
+    document.getElementById('calibResultVal').textContent = `${recommended}%`;
+
+    const applyBtn = document.getElementById('btnCloseCalib');
+    if (applyBtn) {
+      applyBtn.disabled = false;
+      applyBtn.textContent = `✅ 套用 ${recommended}%`;
+    }
+
+    if (count < 3) {
+      this._setCalibFeedback(`✅ 已記錄第 ${count} 揮（幅度 ${swipePct}%）！請再揮 ${3 - count} 次`, 'ok');
+    } else {
+      this._setCalibFeedback(`🎉 3 次量測完成！建議門檻為 ${recommended}%，確認後請按「套用」`, 'ok');
+    }
+  }
+
   _updateCalibration(x, y) {
-    if (!this.calibStartPt) {
+    const now = performance.now();
+    if (this.calibSwipes.length >= 3) return;
+
+    if (now - this.calibLastRecordMs < 600) {
       this.calibStartPt = { x, y };
+      this.calibPeakD = 0;
+      const bar = document.getElementById('calibLiveBarFill');
+      if (bar) bar.style.width = '0%';
+      const pct = document.getElementById('calibLivePct');
+      if (pct) pct.textContent = '0%';
       return;
     }
-    const d = Math.hypot(x - this.calibStartPt.x, y - this.calibStartPt.y);
-    if (d >= 0.12 && this.calibSwipes.length < 3) {
-      this.calibSwipes.push(d);
-      this.calibStartPt = { x, y };
-      document.getElementById('calibCount').textContent = `${this.calibSwipes.length} / 3`;
-      this.sound.playPrepSound('cut', false);
 
-      const avg = this.calibSwipes.reduce((a, b) => a + b, 0) / this.calibSwipes.length;
-      const recommended = Math.min(40, Math.max(8, Math.round(avg * 0.85 * 100)));
-      document.getElementById('calibResultVal').textContent = `${recommended}%`;
-      this.settings.distThreshold = recommended / 100;
-      document.getElementById('rngDistThreshold').value = recommended;
-      document.getElementById('lblDistThreshold').textContent = `${recommended}%`;
+    if (!this.calibStartPt) {
+      this.calibStartPt = { x, y };
+      this.calibPeakD = 0;
+      this.calibPeakTime = now;
+      return;
+    }
+
+    const d = Math.hypot(x - this.calibStartPt.x, y - this.calibStartPt.y);
+    const livePct = Math.round(d * 100);
+    const bar = document.getElementById('calibLiveBarFill');
+    if (bar) bar.style.width = `${Math.min(100, Math.round(d * 220))}%`;
+    const pctEl = document.getElementById('calibLivePct');
+    if (pctEl) pctEl.textContent = `${livePct}%`;
+
+    if (d > this.calibPeakD) {
+      this.calibPeakD = d;
+      this.calibPeakTime = now;
+    }
+
+    if (this.calibPeakD >= 0.10 && (d < this.calibPeakD - 0.035 || now - this.calibPeakTime > 240)) {
+      this._commitCalibrationSwipe(this.calibPeakD, now);
+      return;
+    }
+
+    if (this.calibPeakD >= 0.04 && this.calibPeakD < 0.10 && now - this.calibPeakTime > 480) {
+      this._setCalibFeedback(`有偵測到移動（${Math.round(this.calibPeakD * 100)}%），幅度再大一點點喔！`, 'warn');
+      this.calibStartPt = { x, y };
+      this.calibPeakD = 0;
+      this.calibPeakTime = now;
     }
   }
 }

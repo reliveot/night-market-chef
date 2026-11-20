@@ -23,7 +23,7 @@
 </head>
 <body>
   <header id="mainTopBar" class="top-bar">
-    <div class="brand-title">🏮 台灣夜市料理秀 <span class="badge">V2.5 選關與設定</span></div>
+    <div class="brand-title">🏮 台灣夜市料理秀 <span class="badge">V2.7 選關與設定</span></div>
     <div class="top-controls">
       <button id="btnOpenCalibrate" class="btn-sm">📏 幅度校正</button>
       <button id="btnTogglePerf" class="btn-sm">⚡ 一般效能</button>
@@ -41,6 +41,7 @@
         <p class="subtitle">先選一張關卡卡片，再選道數或時間即可開局；進階治療師參數可在下方細部微調</p>
         <div class="quick-start-row">
           <button id="btnStartCustom" class="btn-primary btn-xl">🚀 套用設定並進入遊戲</button>
+          <button id="btnCancelSettings" class="btn-outline btn-xl">✕ 取消設定</button>
           <button id="btnOpenGallery" class="btn-gallery-hero">📖 50 道夜市圖鑑 (<span id="collectionProgressBadge">0 / 50</span>)</button>
         </div>
       </div>
@@ -329,6 +330,7 @@
             <button id="btnHudCam" class="hud-btn hud-btn-cam" title="開啟／切換鏡頭">📷 開鏡頭</button>
             <button id="btnHudSound" class="hud-btn" title="音效開關">🔊</button>
             <button id="btnHudBgm" class="hud-btn" title="背景音樂開關">🎵</button>
+            <button id="btnHudFullscreen" class="hud-btn" title="切換全螢幕">⛶</button>
             <button id="btnHudSettings" class="hud-btn" title="遊戲設定與圖鑑">⚙️ 設定</button>
             <button id="btnHudFinish" class="hud-btn hud-btn-exit" title="結算">🏁 結算</button>
           </div>
@@ -508,7 +510,10 @@
 
   <div id="modalWelcome" class="modal">
     <div class="modal-box welcome-modal-box">
-      <div class="welcome-badge">🏮 台灣夜市料理秀 V2.6</div>
+      <div class="welcome-top-row">
+        <div class="welcome-badge">🏮 台灣夜市料理秀 V2.7</div>
+        <button id="btnWelcomeFullscreen" class="btn-sm welcome-fs-btn" type="button">⛶ 全螢幕</button>
+      </div>
       <h2>選擇遊玩方式開始出餐！</h2>
       <p class="welcome-how-to">👋 <strong>怎麼玩：</strong>照箭頭方向揮動手部完成備料，第 5 步完成料理出餐！</p>
       <div class="welcome-btn-stack">
@@ -532,15 +537,37 @@
   </div>
 
   <div id="modalCalibrate" class="modal hidden">
-    <div class="modal-box">
+    <div class="modal-box calib-modal-box">
       <h2>📏 個人化動作幅度校正</h2>
-      <p>請用您最舒適、不費力的幅度，向左右或上下揮動手部 <strong>3 次</strong>，系統將自動設定適合您的門檻。</p>
+      <p>請用您最舒適、不費力的幅度，向左右或上下揮動 <strong>3 次</strong>，下方進度條會即時跟著您的動作移動。</p>
+
+      <div class="calib-lamps" aria-label="校正次數進度">
+        <div class="calib-lamp" id="calibLamp0"><span>第 1 揮</span><strong id="calibLampVal0">--</strong></div>
+        <div class="calib-lamp" id="calibLamp1"><span>第 2 揮</span><strong id="calibLampVal1">--</strong></div>
+        <div class="calib-lamp" id="calibLamp2"><span>第 3 揮</span><strong id="calibLampVal2">--</strong></div>
+      </div>
+
+      <div class="calib-meter-wrap">
+        <div class="calib-meter-head">
+          <span>即時揮動幅度</span>
+          <strong id="calibLivePct">0%</strong>
+        </div>
+        <div class="calib-meter-track">
+          <div id="calibLiveBarFill" class="calib-meter-fill"></div>
+          <div class="calib-meter-mark" title="最低有效門檻 10%"></div>
+        </div>
+      </div>
+
+      <div id="calibTouchPad" class="calib-touch-pad hidden">👆 觸控／滑鼠模式：請在此區域內滑動 3 次</div>
+      <div id="calibFeedbackMsg" class="calib-feedback-msg">準備好了！請輕鬆揮動第 1 次</div>
+
       <div class="calib-status">
-        已記錄：<strong id="calibCount">0 / 3</strong> 次｜建議門檻：<strong id="calibResultVal">15%</strong>
+        已記錄：<strong id="calibCount">0 / 3</strong> 次｜建議門檻：<strong id="calibResultVal">--</strong>
       </div>
       <div class="modal-actions">
-        <button id="btnResetCalib" class="btn-outline">重測</button>
-        <button id="btnCloseCalib" class="btn-primary">✅ 完成並套用</button>
+        <button id="btnCancelCalib" class="btn-outline" type="button">✕ 取消</button>
+        <button id="btnResetCalib" class="btn-outline" type="button">🔄 重測</button>
+        <button id="btnCloseCalib" class="btn-primary" type="button" disabled>✅ 套用此幅度</button>
       </div>
     </div>
   </div>
